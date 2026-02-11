@@ -26,8 +26,10 @@ from src.ui.components import (
     render_results_table,
     render_data_quality_report,
     render_empty_state,
-    render_footer
+    render_footer,
+    render_top_5_cards,
 )
+from src.ui.styles import get_global_css, section_header, COLORS
 
 # Utils
 from src.utils.config import get_currency_symbol
@@ -41,6 +43,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ==================== INJECT GLOBAL CSS ====================
+
+st.markdown(f"<style>{get_global_css()}</style>", unsafe_allow_html=True)
 
 
 # ==================== SESSION STATE INITIALIZATION ====================
@@ -135,7 +141,7 @@ def run_screening(config: Dict[str, Any]) -> None:
     exchange = exchange_map.get(index)  # None for US markets
 
     # Step 1: Fetch data with progress bar
-    with st.spinner(f"📥 Fetching data for {total_tickers} tickers from {index}..."):
+    with st.spinner(f"Fetching data for {total_tickers} tickers from {index}..."):
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
@@ -182,7 +188,7 @@ def run_screening(config: Dict[str, Any]) -> None:
             formatted_df = results_df
 
         progress_bar.progress(100)
-        progress_text.text(f"✅ Screening complete!")
+        progress_text.text(f"Screening complete!")
 
         # Store BOTH raw and formatted results in session state
         st.session_state.results_df_raw = results_df  # For visualizations
@@ -201,7 +207,7 @@ def run_screening(config: Dict[str, Any]) -> None:
         progress_text.empty()
 
     st.success(
-        f"🎉 Screening complete! {len(formatted_df)} of {total_tickers} stocks passed all filters."
+        f"Screening complete! {len(formatted_df)} of {total_tickers} stocks passed all filters."
     )
 
 
@@ -230,7 +236,7 @@ def main() -> None:
             run_screening(config)
         else:
             # Only filter thresholds changed - re-apply filters to existing data
-            st.info("ℹ️ Filter thresholds updated. Re-applying filters to cached data...")
+            st.info("Filter thresholds updated. Re-applying filters to cached data...")
             # TODO: Implement filter-only update (future optimization)
             # For now, still re-run full screening
             run_screening(config)
@@ -246,13 +252,30 @@ def main() -> None:
         # Display ticker range info
         index_display_names = {"NIFTY100": "Nifty 100", "SP500": "S&P 500", "FTSE100": "FTSE 100"}
         index_name = index_display_names.get(screening_config['index'], screening_config['index'])
-        st.info(f"🎯 **Screening Top {total_screened} stocks from {index_name} by Market Capitalization**")
+
+        st.markdown(
+            f"""<div style="
+                background: {COLORS['surface']};
+                border: 1px solid {COLORS['border']};
+                border-left: 4px solid {COLORS['accent_blue']};
+                border-radius: 10px;
+                padding: 12px 20px;
+                margin-bottom: 20px;
+                color: {COLORS['text_secondary']};
+                font-size: 0.9rem;
+            ">
+                Screening <strong style="color:{COLORS['text_primary']}">Top {total_screened}</strong>
+                stocks from <strong style="color:{COLORS['text_primary']}">{index_name}</strong>
+                by Market Capitalization
+            </div>""",
+            unsafe_allow_html=True
+        )
 
         # Metric Cards
-        st.subheader("📊 Screening Summary")
+        st.markdown(section_header("Screening Summary"), unsafe_allow_html=True)
         render_metric_cards(total_screened, passed_filters)
 
-        st.markdown("---")
+        st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
         # Derive currency symbol for display
         currency_symbol = get_currency_symbol(screening_config['index'])
@@ -265,40 +288,45 @@ def main() -> None:
             )
 
             with tab_results:
+                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
                 # Create two columns: Scatter plot (left), Summary stats (right)
                 col1, col2 = st.columns([2, 1])
 
                 with col1:
-                    st.subheader("Value Discovery Map")
+                    st.markdown(section_header("Value Discovery Map"), unsafe_allow_html=True)
                     scatter_fig = create_value_scatter_plot(results_df_raw)
                     if scatter_fig:
                         st.plotly_chart(scatter_fig, use_container_width=True)
 
                 with col2:
-                    st.subheader("Top 5 Picks")
-                    top_5_raw = results_df_raw.head(5).copy()
-                    top_5_display = top_5_raw[['rank', 'ticker']].copy()
-                    top_5_display['roic'] = (top_5_raw['roic'] * 100).round(2).astype(str) + '%'
-                    top_5_display['value_score'] = top_5_raw['value_score'].round(3)
+                    st.markdown(section_header("Top 5 Picks"), unsafe_allow_html=True)
+                    render_top_5_cards(results_df_raw)
 
-                    st.dataframe(
-                        top_5_display,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=230
+                    st.markdown(
+                        f"""<div style="
+                            background: {COLORS['surface']};
+                            border: 1px solid {COLORS['border']};
+                            border-radius: 10px;
+                            padding: 14px 18px;
+                            margin-top: 12px;
+                            font-size: 0.82rem;
+                            color: {COLORS['text_secondary']};
+                            line-height: 1.6;
+                        ">
+                            <strong style="color:{COLORS['text_primary']}">How to Read:</strong><br>
+                            <span style="color:{COLORS['accent_green']};">Top-Right</span> = High ROIC + Near 52w Low (Best)<br>
+                            <strong>Bubble Size</strong> = Higher Value Score<br>
+                            <span style="color:{COLORS['accent_green']};">Green</span> = Strong Buy &nbsp;
+                            <span style="color:{COLORS['accent_red']};">Red</span> = Caution
+                        </div>""",
+                        unsafe_allow_html=True
                     )
 
-                    st.info(
-                        "**How to Read:**\n"
-                        "- **Top-Right Quadrant:** High ROIC + Near 52w Low (Best Value)\n"
-                        "- **Bubble Size:** Larger = Higher Value Score\n"
-                        "- **Color:** Green = Strong Buy, Red = Caution"
-                    )
+                st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
-                st.markdown("---")
-
-                # Results Table with new columns and tooltips
-                st.subheader("Detailed Results")
+                # Results Table
+                st.markdown(section_header("Detailed Results"), unsafe_allow_html=True)
                 render_results_table(
                     results_df_formatted,
                     currency_symbol=currency_symbol
@@ -327,7 +355,7 @@ def main() -> None:
                 "- Widen the **Price Near 52w Low** percentage (try 15-20%)"
             )
 
-        st.markdown("---")
+        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
         # Data Quality Report (always show after screening)
         render_data_quality_report()

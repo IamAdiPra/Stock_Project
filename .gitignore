@@ -2,3 +2,5 @@
 __pycache__/
 data/cache/
 nul
+.claude/
+github_token.txt

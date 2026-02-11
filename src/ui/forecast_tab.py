@@ -26,14 +26,15 @@ from src.utils.config import (
     CHART_COLOR_BEAR,
     CHART_COLOR_MARKET,
 )
-
-
-# ==================== CHART STYLE CONSTANTS ====================
-
-_BG_COLOR = "#F8F9FA"
-_GRID_COLOR = "#E0E0E0"
-_TITLE_COLOR = "#2C3E50"
-_FONT_FAMILY = "Arial, sans-serif"
+from src.ui.styles import (
+    get_plotly_theme,
+    get_plotly_theme_with_legend_top,
+    COLORS,
+    FONT_STACK,
+    section_header,
+    metric_card,
+    model_card,
+)
 
 
 # ==================== MAIN ENTRY POINT ====================
@@ -61,6 +62,8 @@ def render_forecast_section(
 
     index = screening_config.get('index', 'SP500')
     currency_symbol = get_currency_symbol(index)
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # Compute forecasts (cached in session state)
     if (st.session_state.get('forecast_df') is None
@@ -111,17 +114,17 @@ def render_forecast_section(
         return
 
     # ---- Summary Table ----
-    st.subheader("Forecast Summary — All Filtered Stocks")
+    st.markdown(section_header("Forecast Summary — All Filtered Stocks"), unsafe_allow_html=True)
     st.caption(
         "Base-case projections using a composite of DCF, Earnings Multiple, and ROIC Growth models. "
         "Alpha = projected stock return minus expected market return."
     )
     render_forecast_summary_table(forecast_df, currency_symbol)
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # ---- Per-Stock Detailed Forecast ----
-    st.subheader("Detailed Stock Forecast")
+    st.markdown(section_header("Detailed Stock Forecast"), unsafe_allow_html=True)
 
     options = []
     ticker_map = {}
@@ -152,15 +155,15 @@ def render_forecast_section(
         st.warning(f"No forecast data for {selected_ticker}.")
         return
 
-    st.markdown("---")
+    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
     # Valuation Summary Cards
     render_valuation_summary_card(forecast, currency_symbol)
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # Price Target Chart (Bull / Base / Bear)
-    st.subheader("5-Year Price Projection")
+    st.markdown(section_header("5-Year Price Projection"), unsafe_allow_html=True)
     st.caption(
         "Bull = historical growth maintained | Base = growth decays toward GDP (3%) | "
         "Bear = 50% of historical growth. Market line = long-term index average return."
@@ -169,19 +172,19 @@ def render_forecast_section(
     if fig:
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # Model Breakdown
-    st.subheader("Model Breakdown")
+    st.markdown(section_header("Model Breakdown"), unsafe_allow_html=True)
     render_model_breakdown(forecast, currency_symbol)
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # Risk Dashboard
-    st.subheader("Risk Assessment")
+    st.markdown(section_header("Risk Assessment"), unsafe_allow_html=True)
     render_risk_dashboard(forecast)
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # Assumptions Table
     render_assumptions_table(forecast, index)
@@ -291,7 +294,7 @@ def render_valuation_summary_card(
     forecast: Dict[str, Any],
     currency_symbol: str,
 ) -> None:
-    """Render valuation summary as metric cards."""
+    """Render valuation summary as styled metric cards."""
     current = forecast["current_price"]
     dcf_val = forecast.get("dcf_intrinsic_value")
     margin = forecast.get("margin_of_safety_pct")
@@ -300,50 +303,72 @@ def render_valuation_summary_card(
     earnings_val = None
     em_base = forecast.get("earnings_multiple", {}).get("base")
     if em_base is not None:
-        # Use 1-year target as proxy for earnings-based value
         earnings_val = em_base.get("horizon_prices", {}).get("5 Years")
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric(
-            label="Current Price",
-            value=f"{currency_symbol}{current:,.2f}",
+        st.markdown(
+            metric_card(
+                label="Current Price",
+                value=f"{currency_symbol}{current:,.2f}",
+                accent="blue",
+            ),
+            unsafe_allow_html=True
         )
 
     with col2:
         if dcf_val is not None:
             delta_pct = (dcf_val - current) / current * 100
-            st.metric(
-                label="DCF Intrinsic Value",
-                value=f"{currency_symbol}{dcf_val:,.2f}",
-                delta=f"{delta_pct:+.1f}% vs price",
-                delta_color="normal",
+            st.markdown(
+                metric_card(
+                    label="DCF Intrinsic Value",
+                    value=f"{currency_symbol}{dcf_val:,.2f}",
+                    delta=f"{delta_pct:+.1f}% vs price",
+                    accent="green" if delta_pct > 0 else "red",
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="DCF Intrinsic Value", value="N/A")
+            st.markdown(
+                metric_card(label="DCF Intrinsic Value", value="N/A", accent="blue"),
+                unsafe_allow_html=True
+            )
 
     with col3:
         if earnings_val is not None:
             delta_pct = (earnings_val - current) / current * 100
-            st.metric(
-                label="Earnings Model (5Y)",
-                value=f"{currency_symbol}{earnings_val:,.2f}",
-                delta=f"{delta_pct:+.1f}% vs price",
-                delta_color="normal",
+            st.markdown(
+                metric_card(
+                    label="Earnings Model (5Y)",
+                    value=f"{currency_symbol}{earnings_val:,.2f}",
+                    delta=f"{delta_pct:+.1f}% vs price",
+                    accent="green" if delta_pct > 0 else "red",
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Earnings Model (5Y)", value="N/A")
+            st.markdown(
+                metric_card(label="Earnings Model (5Y)", value="N/A", accent="blue"),
+                unsafe_allow_html=True
+            )
 
     with col4:
         if margin is not None:
-            st.metric(
-                label="Margin of Safety",
-                value=f"{margin:+.1f}%",
-                help="Positive = price below intrinsic value (undervalued)",
+            st.markdown(
+                metric_card(
+                    label="Margin of Safety",
+                    value=f"{margin:+.1f}%",
+                    delta="Undervalued" if margin > 0 else "Overvalued",
+                    accent="green" if margin > 0 else "red",
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Margin of Safety", value="N/A")
+            st.markdown(
+                metric_card(label="Margin of Safety", value="N/A", accent="blue"),
+                unsafe_allow_html=True
+            )
 
 
 # ==================== PRICE TARGET CHART ====================
@@ -414,34 +439,27 @@ def create_price_target_chart(
     fig.add_hline(
         y=current,
         line_dash="dot",
-        line_color="rgba(0, 0, 0, 0.3)",
+        line_color=COLORS['text_muted'],
         annotation_text=f"Current: {currency_symbol}{current:,.2f}",
         annotation_position="top left",
         annotation_font_size=10,
+        annotation_font_color=COLORS['text_secondary'],
     )
 
     ticker = forecast.get("ticker", "")
+
+    # Apply theme
+    theme = get_plotly_theme_with_legend_top()
+    fig.update_layout(**theme)
+
     fig.update_layout(
         title=dict(
             text=f"{ticker} — 5-Year Price Projection (Bull / Base / Bear)",
-            font=dict(size=18, color=_TITLE_COLOR, family=_FONT_FAMILY),
-            x=0.5,
         ),
         yaxis_title=f"Projected Price ({currency_symbol})",
         xaxis_title="Time Horizon",
-        plot_bgcolor=_BG_COLOR,
-        paper_bgcolor='white',
-        xaxis=dict(gridcolor=_GRID_COLOR),
-        yaxis=dict(gridcolor=_GRID_COLOR),
         height=500,
         margin=dict(l=60, r=40, t=80, b=60),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1,
-        ),
         hovermode='x unified',
     )
 
@@ -454,55 +472,70 @@ def render_model_breakdown(
     forecast: Dict[str, Any],
     currency_symbol: str,
 ) -> None:
-    """Show individual model outputs in a 3-column layout."""
+    """Show individual model outputs in styled card containers."""
     col1, col2, col3 = st.columns(3)
 
     # DCF Model
     with col1:
-        st.markdown("**DCF Model**")
         dcf_base = forecast.get("dcf", {}).get("base")
         if dcf_base is not None:
-            st.markdown(f"- WACC: **{dcf_base['wacc']*100:.1f}%**")
-            st.markdown(f"- FCF CAGR: **{dcf_base['fcf_cagr']*100:.1f}%**")
-            st.markdown(f"- Terminal Growth: **{TERMINAL_GROWTH_RATE*100:.0f}%**")
             intrinsic = dcf_base['intrinsic_value_per_share']
-            st.markdown(f"- Intrinsic Value: **{currency_symbol}{intrinsic:,.2f}**")
+            items = (
+                f"WACC: <strong>{dcf_base['wacc']*100:.1f}%</strong><br>"
+                f"FCF CAGR: <strong>{dcf_base['fcf_cagr']*100:.1f}%</strong><br>"
+                f"Terminal Growth: <strong>{TERMINAL_GROWTH_RATE*100:.0f}%</strong><br>"
+                f"Intrinsic Value: <strong>{currency_symbol}{intrinsic:,.2f}</strong><br>"
+            )
             for label in ["1 Year", "5 Years"]:
                 price = dcf_base["horizon_prices"].get(label)
                 if price is not None:
-                    st.markdown(f"- {label} Target: {currency_symbol}{price:,.2f}")
+                    items += f"{label} Target: {currency_symbol}{price:,.2f}<br>"
+            st.markdown(model_card("DCF Model", items, accent="green"), unsafe_allow_html=True)
         else:
-            st.caption("Insufficient data for DCF model.")
+            st.markdown(
+                model_card("DCF Model", "<em>Insufficient data for DCF model.</em>", accent="green"),
+                unsafe_allow_html=True
+            )
 
     # Earnings Multiple Model
     with col2:
-        st.markdown("**Earnings Multiple Model**")
         em_base = forecast.get("earnings_multiple", {}).get("base")
         if em_base is not None:
-            st.markdown(f"- EPS CAGR: **{em_base['eps_cagr']*100:.1f}%**")
-            st.markdown(f"- Target P/E: **{em_base['target_pe']:.1f}x**")
-            st.markdown(f"- Current EPS: **{currency_symbol}{em_base['current_eps']:,.2f}**")
+            items = (
+                f"EPS CAGR: <strong>{em_base['eps_cagr']*100:.1f}%</strong><br>"
+                f"Target P/E: <strong>{em_base['target_pe']:.1f}x</strong><br>"
+                f"Current EPS: <strong>{currency_symbol}{em_base['current_eps']:,.2f}</strong><br>"
+            )
             for label in ["1 Year", "5 Years"]:
                 price = em_base["horizon_prices"].get(label)
                 if price is not None:
-                    st.markdown(f"- {label} Target: {currency_symbol}{price:,.2f}")
+                    items += f"{label} Target: {currency_symbol}{price:,.2f}<br>"
+            st.markdown(model_card("Earnings Multiple Model", items, accent="blue"), unsafe_allow_html=True)
         else:
-            st.caption("Insufficient data for Earnings model.")
+            st.markdown(
+                model_card("Earnings Multiple Model", "<em>Insufficient data for Earnings model.</em>", accent="blue"),
+                unsafe_allow_html=True
+            )
 
     # ROIC Growth Model
     with col3:
-        st.markdown("**ROIC Growth Model**")
         roic_base = forecast.get("roic_growth", {}).get("base")
         if roic_base is not None:
-            st.markdown(f"- ROIC: **{roic_base['roic']*100:.1f}%**")
-            st.markdown(f"- Reinvestment Rate: **{roic_base['reinvestment_rate']*100:.0f}%**")
-            st.markdown(f"- Sustainable Growth: **{roic_base['sustainable_growth']*100:.1f}%**")
+            items = (
+                f"ROIC: <strong>{roic_base['roic']*100:.1f}%</strong><br>"
+                f"Reinvestment Rate: <strong>{roic_base['reinvestment_rate']*100:.0f}%</strong><br>"
+                f"Sustainable Growth: <strong>{roic_base['sustainable_growth']*100:.1f}%</strong><br>"
+            )
             for label in ["1 Year", "5 Years"]:
                 price = roic_base["horizon_prices"].get(label)
                 if price is not None:
-                    st.markdown(f"- {label} Target: {currency_symbol}{price:,.2f}")
+                    items += f"{label} Target: {currency_symbol}{price:,.2f}<br>"
+            st.markdown(model_card("ROIC Growth Model", items, accent="purple"), unsafe_allow_html=True)
         else:
-            st.caption("Insufficient data for ROIC model.")
+            st.markdown(
+                model_card("ROIC Growth Model", "<em>Insufficient data for ROIC model.</em>", accent="purple"),
+                unsafe_allow_html=True
+            )
 
     # Models used indicator
     models_used = forecast.get("models_used", 0)
@@ -513,7 +546,7 @@ def render_model_breakdown(
 # ==================== RISK DASHBOARD ====================
 
 def render_risk_dashboard(forecast: Dict[str, Any]) -> None:
-    """Render risk metrics as metric cards."""
+    """Render risk metrics as styled metric cards."""
     risk = forecast.get("risk")
     if risk is None:
         st.info("Risk metrics unavailable.")
@@ -524,48 +557,66 @@ def render_risk_dashboard(forecast: Dict[str, Any]) -> None:
     with col1:
         beta = risk.get("beta")
         if beta is not None:
-            risk_label = "Low" if beta < 0.8 else ("High" if beta > 1.3 else "Medium")
-            st.metric(
-                label="Beta",
-                value=f"{beta:.2f}",
-                help=f"Systematic risk ({risk_label}). 1.0 = market average.",
+            risk_level = "Low" if beta < 0.8 else ("High" if beta > 1.3 else "Medium")
+            accent = "green" if beta < 0.8 else ("red" if beta > 1.3 else "amber")
+            st.markdown(
+                metric_card(
+                    label="Beta",
+                    value=f"{beta:.2f}",
+                    delta=risk_level,
+                    accent=accent,
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Beta", value="N/A")
+            st.markdown(metric_card(label="Beta", value="N/A", accent="blue"), unsafe_allow_html=True)
 
     with col2:
         vol = risk.get("annual_volatility")
         if vol is not None:
-            st.metric(
-                label="Annual Volatility",
-                value=f"{vol*100:.1f}%",
-                help="Annualized standard deviation of daily returns. Lower = less risky.",
+            accent = "green" if vol < 0.20 else ("red" if vol > 0.40 else "amber")
+            st.markdown(
+                metric_card(
+                    label="Annual Volatility",
+                    value=f"{vol*100:.1f}%",
+                    accent=accent,
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Annual Volatility", value="N/A")
+            st.markdown(metric_card(label="Annual Volatility", value="N/A", accent="blue"), unsafe_allow_html=True)
 
     with col3:
         mdd = risk.get("max_drawdown_pct")
         if mdd is not None:
-            st.metric(
-                label="Max Drawdown (1Y)",
-                value=f"{mdd:.1f}%",
-                help="Worst peak-to-trough decline over the past year.",
+            accent = "green" if mdd > -15 else ("red" if mdd < -30 else "amber")
+            st.markdown(
+                metric_card(
+                    label="Max Drawdown (1Y)",
+                    value=f"{mdd:.1f}%",
+                    accent=accent,
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Max Drawdown (1Y)", value="N/A")
+            st.markdown(metric_card(label="Max Drawdown (1Y)", value="N/A", accent="blue"), unsafe_allow_html=True)
 
     with col4:
         sharpe = risk.get("sharpe_ratio")
         if sharpe is not None:
             quality = "Excellent" if sharpe > 1.0 else ("Good" if sharpe > 0.5 else "Poor")
-            st.metric(
-                label="Sharpe Ratio",
-                value=f"{sharpe:.2f}",
-                help=f"Risk-adjusted return ({quality}). >1.0 = excellent, <0.5 = poor.",
+            accent = "green" if sharpe > 1.0 else ("amber" if sharpe > 0.5 else "red")
+            st.markdown(
+                metric_card(
+                    label="Sharpe Ratio",
+                    value=f"{sharpe:.2f}",
+                    delta=quality,
+                    accent=accent,
+                ),
+                unsafe_allow_html=True
             )
         else:
-            st.metric(label="Sharpe Ratio", value="N/A")
+            st.markdown(metric_card(label="Sharpe Ratio", value="N/A", accent="blue"), unsafe_allow_html=True)
 
 
 # ==================== ASSUMPTIONS TABLE ====================
@@ -575,7 +626,7 @@ def render_assumptions_table(
     index: str,
 ) -> None:
     """Show all model assumptions in a clean table."""
-    st.subheader("Model Assumptions")
+    st.markdown(section_header("Model Assumptions"), unsafe_allow_html=True)
     st.caption(
         "All models use publicly available financial data. "
         "Projections are not investment advice — they illustrate what valuations "

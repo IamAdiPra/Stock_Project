@@ -23,14 +23,13 @@ from src.utils.config import (
     CHART_COLOR_NEGATIVE,
     CHART_COLOR_NEUTRAL,
 )
-
-
-# ==================== CHART STYLE CONSTANTS ====================
-
-_BG_COLOR = "#F8F9FA"
-_GRID_COLOR = "#E0E0E0"
-_TITLE_COLOR = "#2C3E50"
-_FONT_FAMILY = "Arial, sans-serif"
+from src.ui.styles import (
+    get_plotly_theme,
+    get_plotly_theme_with_legend_top,
+    COLORS,
+    FONT_STACK,
+    section_header,
+)
 
 
 # ==================== MAIN ENTRY POINT ====================
@@ -55,6 +54,8 @@ def render_deep_dive_section(
     if results_df_raw.empty:
         st.info("No stocks passed filters. Relax thresholds to explore individual stocks.")
         return
+
+    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
     # Build selectbox options
     options = []
@@ -89,10 +90,10 @@ def render_deep_dive_section(
     currency_symbol = get_currency_symbol(index)
     normalized = normalize_ticker(selected_ticker, exchange=exchange or "NYSE")
 
-    st.markdown("---")
+    st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
     # ---- Price Chart with Bollinger Bands ----
-    st.subheader("1-Year Price Action with Bollinger Bands")
+    st.markdown(section_header("1-Year Price Action with Bollinger Bands"), unsafe_allow_html=True)
     st.caption(
         "Bollinger Bands are statistical boundaries (20-day average +/- 2 standard deviations). "
         "Price near the lower band may indicate oversold conditions."
@@ -107,10 +108,10 @@ def render_deep_dive_section(
     else:
         st.warning(f"Historical price data unavailable for {selected_ticker}.")
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # ---- Quality Trends (ROIC + FCF) ----
-    st.subheader("3-Year Quality Trends")
+    st.markdown(section_header("3-Year Quality Trends"), unsafe_allow_html=True)
 
     income_stmt = data.get('income_statement')
     balance_sheet = data.get('balance_sheet')
@@ -132,10 +133,10 @@ def render_deep_dive_section(
         else:
             st.info("Free Cash Flow trend data unavailable.")
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # ---- P/E Valuation (Mean Reversion) ----
-    st.subheader("P/E Valuation: Mean Reversion")
+    st.markdown(section_header("P/E Valuation: Mean Reversion"), unsafe_allow_html=True)
     st.caption(
         "Mean Reversion: stocks tend to return to their long-term average P/E ratio. "
         "A current P/E below the 3-year average may signal undervaluation."
@@ -146,7 +147,7 @@ def render_deep_dive_section(
     else:
         st.info("P/E valuation data unavailable (company may have negative earnings).")
 
-    st.markdown("---")
+    st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
     # ---- Due Diligence Links ----
     render_due_diligence_links(selected_ticker, index)
@@ -206,7 +207,7 @@ def create_price_bollinger_chart(
         y=bb_df['BB_Upper'],
         mode='lines',
         name='Upper Band',
-        line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dash'),
+        line=dict(color='rgba(99, 102, 241, 0.4)', width=1, dash='dash'),
     ))
 
     # Lower Bollinger Band (with fill between upper and lower)
@@ -215,32 +216,24 @@ def create_price_bollinger_chart(
         y=bb_df['BB_Lower'],
         mode='lines',
         name='Lower Band',
-        line=dict(color='rgba(128, 128, 128, 0.5)', width=1, dash='dash'),
+        line=dict(color='rgba(99, 102, 241, 0.4)', width=1, dash='dash'),
         fill='tonexty',
-        fillcolor='rgba(173, 216, 230, 0.15)',
+        fillcolor='rgba(99, 102, 241, 0.08)',
     ))
+
+    # Apply theme
+    theme = get_plotly_theme_with_legend_top()
+    fig.update_layout(**theme)
 
     fig.update_layout(
         title=dict(
-            text=f"{ticker} - 1 Year Price with Bollinger Bands",
-            font=dict(size=18, color=_TITLE_COLOR, family=_FONT_FAMILY),
-            x=0.5,
+            text=f"{ticker} — 1 Year Price with Bollinger Bands",
         ),
         yaxis_title=f"Price ({currency_symbol})",
         xaxis_title="Date",
-        plot_bgcolor=_BG_COLOR,
-        paper_bgcolor='white',
-        xaxis=dict(gridcolor=_GRID_COLOR, rangeslider=dict(visible=False)),
-        yaxis=dict(gridcolor=_GRID_COLOR),
+        xaxis=dict(rangeslider=dict(visible=False)),
         height=500,
         margin=dict(l=60, r=40, t=80, b=60),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
         hovermode='x unified',
     )
 
@@ -272,13 +265,13 @@ def create_roic_trend_chart(
     years = [t['year'] for t in valid]
     roic_pcts = [t['roic'] * 100 for t in valid]
 
-    # Color-code bars: green >15%, yellow 10-15%, red <10%
+    # Color-code bars: green >15%, amber 10-15%, red <10%
     colors = []
     for r in roic_pcts:
         if r >= 15:
             colors.append(CHART_COLOR_POSITIVE)
         elif r >= 10:
-            colors.append("#FFA726")  # Orange/yellow
+            colors.append(COLORS['accent_amber'])
         else:
             colors.append(CHART_COLOR_NEGATIVE)
 
@@ -290,6 +283,7 @@ def create_roic_trend_chart(
         marker_color=colors,
         text=[f"{r:.1f}%" for r in roic_pcts],
         textposition='outside',
+        textfont=dict(color=COLORS['text_secondary']),
         name='ROIC',
     ))
 
@@ -297,23 +291,19 @@ def create_roic_trend_chart(
     fig.add_hline(
         y=15,
         line_dash="dash",
-        line_color="rgba(0, 0, 0, 0.4)",
+        line_color=COLORS['text_muted'],
         annotation_text="15% baseline",
         annotation_position="top right",
         annotation_font_size=10,
+        annotation_font_color=COLORS['text_muted'],
     )
 
+    # Apply theme
+    fig.update_layout(**get_plotly_theme())
     fig.update_layout(
-        title=dict(
-            text="ROIC Trend (3-Year)",
-            font=dict(size=16, color=_TITLE_COLOR, family=_FONT_FAMILY),
-            x=0.5,
-        ),
+        title=dict(text="ROIC Trend (3-Year)"),
         yaxis_title="ROIC (%)",
         xaxis_title="Fiscal Year",
-        plot_bgcolor=_BG_COLOR,
-        paper_bgcolor='white',
-        yaxis=dict(gridcolor=_GRID_COLOR),
         height=350,
         margin=dict(l=50, r=30, t=60, b=50),
         showlegend=False,
@@ -359,20 +349,16 @@ def create_fcf_trend_chart(
         marker_color=colors,
         text=labels,
         textposition='outside',
+        textfont=dict(color=COLORS['text_secondary']),
         name='FCF',
     ))
 
+    # Apply theme
+    fig.update_layout(**get_plotly_theme())
     fig.update_layout(
-        title=dict(
-            text="Free Cash Flow Trend (3-Year)",
-            font=dict(size=16, color=_TITLE_COLOR, family=_FONT_FAMILY),
-            x=0.5,
-        ),
+        title=dict(text="Free Cash Flow Trend (3-Year)"),
         yaxis_title=f"FCF ({currency_symbol})",
         xaxis_title="Fiscal Year",
-        plot_bgcolor=_BG_COLOR,
-        paper_bgcolor='white',
-        yaxis=dict(gridcolor=_GRID_COLOR),
         height=350,
         margin=dict(l=50, r=30, t=60, b=50),
         showlegend=False,
@@ -414,7 +400,7 @@ def create_pe_valuation_chart(
     if normalized_pe is not None:
         categories.append("3-Year Avg P/E")
         values.append(round(normalized_pe, 1))
-        colors.append("#90A4AE")  # Gray-blue
+        colors.append(COLORS['text_muted'])
 
     fig = go.Figure()
 
@@ -424,6 +410,7 @@ def create_pe_valuation_chart(
         marker_color=colors,
         text=[f"{v:.1f}x" for v in values],
         textposition='outside',
+        textfont=dict(color=COLORS['text_secondary']),
         width=0.5,
     ))
 
@@ -442,19 +429,14 @@ def create_pe_valuation_chart(
             xref="paper", yref="paper",
             x=0.5, y=-0.15,
             showarrow=False,
-            font=dict(size=13, color=annotation_color, family=_FONT_FAMILY),
+            font=dict(size=13, color=annotation_color, family=FONT_STACK),
         )
 
+    # Apply theme
+    fig.update_layout(**get_plotly_theme())
     fig.update_layout(
-        title=dict(
-            text="P/E Ratio: Mean Reversion Analysis",
-            font=dict(size=16, color=_TITLE_COLOR, family=_FONT_FAMILY),
-            x=0.5,
-        ),
+        title=dict(text="P/E Ratio: Mean Reversion Analysis"),
         yaxis_title="P/E Ratio (x)",
-        plot_bgcolor=_BG_COLOR,
-        paper_bgcolor='white',
-        yaxis=dict(gridcolor=_GRID_COLOR),
         height=350,
         margin=dict(l=50, r=30, t=60, b=80),
         showlegend=False,
@@ -473,7 +455,7 @@ def render_due_diligence_links(ticker: str, index: str) -> None:
         ticker: Raw ticker symbol (without exchange suffix)
         index: 'NIFTY100' or 'SP500'
     """
-    st.subheader("Due Diligence")
+    st.markdown(section_header("Due Diligence"), unsafe_allow_html=True)
 
     urls = DUE_DILIGENCE_URLS.get(index, {})
 

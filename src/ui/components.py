@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 import pandas as pd
 import streamlit as st
 from src.utils.logger import get_data_quality_log, get_failure_summary
+from src.ui.styles import COLORS, metric_card, top_pick_card, section_header
 
 
 def render_metric_cards(total_screened: int, passed_filters: int) -> None:
@@ -24,24 +25,55 @@ def render_metric_cards(total_screened: int, passed_filters: int) -> None:
     # Calculate pass rate
     pass_rate = (passed_filters / total_screened * 100) if total_screened > 0 else 0
 
-    # Create two columns for side-by-side metrics
     col1, col2 = st.columns(2)
 
     with col1:
-        st.metric(
-            label="📊 Total Stocks Screened",
-            value=f"{total_screened:,}",
-            help="Number of tickers fetched and analyzed from the selected index"
+        st.markdown(
+            metric_card(
+                label="Total Stocks Screened",
+                value=f"{total_screened:,}",
+                accent="blue",
+            ),
+            unsafe_allow_html=True
         )
 
     with col2:
-        st.metric(
-            label="✅ Passed All Filters",
-            value=f"{passed_filters:,}",
-            delta=f"{pass_rate:.1f}% Pass Rate",
-            delta_color="normal",
-            help="Stocks meeting ALL quality and valuation criteria"
+        st.markdown(
+            metric_card(
+                label="Passed All Filters",
+                value=f"{passed_filters:,}",
+                delta=f"{pass_rate:.1f}% Pass Rate",
+                accent="green",
+            ),
+            unsafe_allow_html=True
         )
+
+
+def render_top_5_cards(results_df_raw: pd.DataFrame) -> None:
+    """
+    Render the Top 5 picks as styled card components.
+
+    Args:
+        results_df_raw: Raw screening results DataFrame
+    """
+    top_5 = results_df_raw.head(5)
+
+    if top_5.empty:
+        st.info("No stocks to display.")
+        return
+
+    cards_html = ""
+    for _, row in top_5.iterrows():
+        rank = int(row.get('rank', 0))
+        ticker = str(row.get('ticker', 'N/A'))
+        roic_val = row.get('roic', 0)
+        roic_str = f"{roic_val * 100:.1f}%" if pd.notna(roic_val) else "N/A"
+        score_val = row.get('value_score', 0)
+        score_str = f"{score_val:.3f}" if pd.notna(score_val) else "N/A"
+
+        cards_html += top_pick_card(rank, ticker, roic_str, score_str)
+
+    st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def render_results_table(
@@ -183,42 +215,51 @@ def render_data_quality_report() -> None:
 
     # Create expander (collapsed by default if no issues)
     with st.expander(
-        f"🔍 Data Quality Report ({total_issues} issues)",
+        f"Data Quality Report ({total_issues} issues)",
         expanded=(total_issues > 0)
     ):
         if total_issues == 0:
-            st.success("✅ All tickers fetched successfully with complete data!")
+            st.success("All tickers fetched successfully with complete data!")
             return
 
         # Display summary counts
-        st.subheader("Issue Summary")
+        st.markdown(section_header("Issue Summary"), unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric(
-                "Fetch Failures",
-                failure_summary.get('fetch_failure', 0),
-                help="Tickers that could not be fetched from yfinance API"
+            st.markdown(
+                metric_card(
+                    label="Fetch Failures",
+                    value=str(failure_summary.get('fetch_failure', 0)),
+                    accent="red",
+                ),
+                unsafe_allow_html=True
             )
 
         with col2:
-            st.metric(
-                "Validation Errors",
-                failure_summary.get('validation_error', 0),
-                help="Tickers with missing required financial fields"
+            st.markdown(
+                metric_card(
+                    label="Validation Errors",
+                    value=str(failure_summary.get('validation_error', 0)),
+                    accent="amber",
+                ),
+                unsafe_allow_html=True
             )
 
         with col3:
-            st.metric(
-                "Incomplete Data",
-                failure_summary.get('incomplete_data', 0),
-                help="Tickers with partial data (< 70% completeness)"
+            st.markdown(
+                metric_card(
+                    label="Incomplete Data",
+                    value=str(failure_summary.get('incomplete_data', 0)),
+                    accent="blue",
+                ),
+                unsafe_allow_html=True
             )
 
-        st.markdown("---")
+        st.markdown("<div style='height: 16px;'></div>", unsafe_allow_html=True)
 
         # Display detailed issue log
-        st.subheader("Detailed Issues")
+        st.markdown(section_header("Detailed Issues"), unsafe_allow_html=True)
 
         # Convert log to DataFrame for better display
         if quality_log:
@@ -250,14 +291,35 @@ def render_empty_state(message: str = "No data to display") -> None:
     Args:
         message: Custom message to display
     """
-    st.info(f"ℹ️ {message}")
     st.markdown(
-        """
-        **To get started:**
-        1. Select an index (Nifty 100 or S&P 500) in the sidebar
-        2. Adjust filter thresholds (ROIC, D/E, Price Near Low)
-        3. Click **Run Screening** to fetch data and see results
-        """
+        f"""<div style="
+            text-align: center;
+            padding: 60px 20px;
+            color: {COLORS['text_secondary']};
+        ">
+            <div style="
+                font-size: 3rem;
+                margin-bottom: 16px;
+                opacity: 0.3;
+            ">&#9776;</div>
+            <div style="
+                font-size: 1.1rem;
+                color: {COLORS['text_primary']};
+                font-weight: 500;
+                margin-bottom: 12px;
+            ">{message}</div>
+            <div style="
+                font-size: 0.88rem;
+                line-height: 1.8;
+                max-width: 400px;
+                margin: 0 auto;
+            ">
+                <strong>1.</strong> Select an index in the sidebar<br>
+                <strong>2.</strong> Adjust filter thresholds (ROIC, D/E, Price)<br>
+                <strong>3.</strong> Click <strong>Run Screening</strong> to analyze
+            </div>
+        </div>""",
+        unsafe_allow_html=True
     )
 
 
@@ -268,7 +330,7 @@ def render_loading_placeholder(step: str = "Fetching data...") -> None:
     Args:
         step: Current processing step description
     """
-    with st.spinner(f"⏳ {step}"):
+    with st.spinner(f"{step}"):
         st.empty()
 
 
@@ -276,27 +338,50 @@ def render_header() -> None:
     """
     Render application header with title and description.
     """
-    st.title("📈 Stock Value Screener")
     st.markdown(
-        """
-        **Professional-grade stock screening for value investors.**
-        Combines fundamental health metrics (ROIC, FCF, Debt/Equity) with price-action
-        discounting to identify undervalued quality companies.
-        """
+        f"""<div style="padding: 12px 0 20px 0;">
+            <div style="
+                font-size: 2rem;
+                font-weight: 700;
+                color: {COLORS['text_primary']};
+                letter-spacing: -0.03em;
+                line-height: 1.2;
+            ">Stock Value Screener</div>
+            <div style="
+                font-size: 0.95rem;
+                color: {COLORS['text_secondary']};
+                margin-top: 6px;
+                max-width: 600px;
+            ">
+                Professional-grade screening for value investors.
+                Combines fundamental health metrics with price-action
+                discounting to identify undervalued quality companies.
+            </div>
+        </div>""",
+        unsafe_allow_html=True
     )
-    st.markdown("---")
 
 
 def render_footer() -> None:
     """
     Render application footer with disclaimers and credits.
     """
-    st.markdown("---")
-    st.caption(
-        "⚠️ **Disclaimer:** This tool is for educational and research purposes only. "
-        "Not investment advice. Always conduct your own due diligence before investing."
-    )
-    st.caption(
-        "🔧 **Built with:** Streamlit, Plotly, yfinance | "
-        "**Data Refresh:** Fundamentals (24h), Price (1h)"
+    st.markdown(
+        f"""<div style="
+            margin-top: 40px;
+            padding: 20px 0;
+            border-top: 1px solid {COLORS['border']};
+            text-align: center;
+            font-size: 0.75rem;
+            color: {COLORS['text_muted']};
+            line-height: 1.8;
+        ">
+            <strong style="color:{COLORS['text_secondary']}">Disclaimer:</strong>
+            This tool is for educational and research purposes only.
+            Not investment advice. Always conduct your own due diligence.<br>
+            Built with Streamlit, Plotly, yfinance &nbsp;&bull;&nbsp;
+            Fundamentals: 24h cache &nbsp;&bull;&nbsp; Price: 1h cache &nbsp;&bull;&nbsp;
+            <strong>Stock Value Screener v1.1.0</strong>
+        </div>""",
+        unsafe_allow_html=True
     )

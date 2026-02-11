@@ -8,6 +8,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 
+from src.ui.styles import get_plotly_theme, COLORS, FONT_STACK
+
 
 def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
     """
@@ -17,7 +19,7 @@ def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
     - X-axis: Distance from 52-week Low (%)
     - Y-axis: ROIC (%)
     - Bubble Size: Scaled by Value Score (larger = better)
-    - Bubble Color: RdYlGn gradient (Green = high value, Red = low value)
+    - Bubble Color: Custom green-amber-red gradient
 
     Args:
         df: Screening results DataFrame with columns:
@@ -63,6 +65,14 @@ def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
     # Format market cap for hover
     plot_df['market_cap_fmt'] = plot_df['market_cap'].apply(_format_market_cap)
 
+    # Custom color scale matching Midnight Finance palette
+    color_scale = [
+        [0.0, COLORS['accent_red']],
+        [0.4, COLORS['accent_amber']],
+        [0.7, COLORS['accent_green']],
+        [1.0, "#34D399"],  # Lighter emerald for top values
+    ]
+
     # Create scatter plot using Plotly Express (easier for color scales)
     fig = px.scatter(
         plot_df,
@@ -70,7 +80,7 @@ def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
         y='roic_pct',
         size='bubble_size',
         color='value_score',
-        color_continuous_scale='RdYlGn',  # Red-Yellow-Green gradient
+        color_continuous_scale=color_scale,
         hover_name='ticker',
         hover_data={
             'company_name': True,
@@ -86,67 +96,43 @@ def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
             'value_score': 'Value Score',
             'market_cap_fmt': 'Market Cap'
         },
-        title='📈 Value Discovery Map: ROIC vs Price Discount'
+        title='Value Discovery Map: ROIC vs Price Discount'
     )
 
-    # Customize layout for professional appearance
+    # Apply Midnight Finance theme
+    theme = get_plotly_theme()
+    fig.update_layout(**theme)
+
+    # Override specific settings for this chart
     fig.update_layout(
-        # Title styling
-        title_font_size=20,
-        title_font_color='#2C3E50',
-        title_x=0.5,  # Center title
-        title_xanchor='center',
-
-        # Plot area styling
-        plot_bgcolor='#F8F9FA',
-        paper_bgcolor='white',
-
-        # Axes styling
-        xaxis=dict(
-            title_font_size=14,
-            showgrid=True,
-            gridcolor='#E0E0E0',
-            zeroline=True,
-            zerolinecolor='#BDBDBD',
-            zerolinewidth=2
-        ),
-        yaxis=dict(
-            title_font_size=14,
-            showgrid=True,
-            gridcolor='#E0E0E0',
-            zeroline=True,
-            zerolinecolor='#BDBDBD',
-            zerolinewidth=2
-        ),
+        # Responsive sizing
+        height=600,
+        margin=dict(l=80, r=80, t=80, b=80),
 
         # Hover styling
         hovermode='closest',
-        hoverlabel=dict(
-            bgcolor='white',
-            font_size=12,
-            font_family='Arial'
-        ),
 
-        # Legend/Colorbar styling
+        # Colorbar
         coloraxis_colorbar=dict(
-            title='Value Score',
-            title_font_size=12,
-            thickness=15,
-            len=0.7
+            title=dict(
+                text='Value Score',
+                font=dict(color=COLORS['text_secondary'], size=12),
+            ),
+            tickfont=dict(color=COLORS['text_secondary']),
+            thickness=12,
+            len=0.6,
+            outlinecolor=COLORS['border'],
+            bgcolor=COLORS['surface'],
         ),
-
-        # Responsive sizing
-        height=600,
-        margin=dict(l=80, r=80, t=100, b=80)
     )
 
     # Update marker styling
     fig.update_traces(
         marker=dict(
-            line=dict(width=1, color='#34495E'),  # Dark border for bubbles
-            opacity=0.8,
+            line=dict(width=1, color=COLORS['border']),
+            opacity=0.85,
             sizemode='diameter',
-            sizemin=4
+            sizemin=5
         )
     )
 
@@ -173,17 +159,13 @@ def create_roic_distribution_chart(df: pd.DataFrame) -> Optional[go.Figure]:
         plot_df,
         x='roic_pct',
         nbins=20,
-        color_discrete_sequence=['#00CC96'],
+        color_discrete_sequence=[COLORS['accent_green']],
         labels={'roic_pct': 'ROIC (%)'},
         title='ROIC Distribution'
     )
 
+    fig.update_layout(**get_plotly_theme())
     fig.update_layout(
-        title_font_size=16,
-        title_x=0.5,
-        title_xanchor='center',
-        plot_bgcolor='#F8F9FA',
-        paper_bgcolor='white',
         height=300,
         showlegend=False
     )
@@ -207,22 +189,24 @@ def create_debt_equity_chart(df: pd.DataFrame) -> Optional[go.Figure]:
     # Take top 10 stocks by value_score
     plot_df = df.head(10).copy()
 
+    color_scale = [
+        [0.0, COLORS['accent_green']],
+        [0.5, COLORS['accent_amber']],
+        [1.0, COLORS['accent_red']],
+    ]
+
     fig = px.bar(
         plot_df,
         x='ticker',
         y='debt_to_equity',
         color='debt_to_equity',
-        color_continuous_scale='RdYlGn_r',  # Reversed (low debt = green)
+        color_continuous_scale=color_scale,
         labels={'debt_to_equity': 'Debt/Equity Ratio', 'ticker': 'Ticker'},
         title='Debt/Equity Ratios (Top 10 Stocks)'
     )
 
+    fig.update_layout(**get_plotly_theme())
     fig.update_layout(
-        title_font_size=16,
-        title_x=0.5,
-        title_xanchor='center',
-        plot_bgcolor='#F8F9FA',
-        paper_bgcolor='white',
         height=350,
         showlegend=False
     )

@@ -143,10 +143,28 @@ def fetch_ticker_data(ticker: str) -> dict:
 ## Current Status
 
 ### Version
-**v1.0.0** - Forecast & Valuation Tab (Multi-Model Quant Engine)
+**v1.1.0** - UI/UX Modernization (Midnight Finance Theme)
 
 ### Last Implementation
-- **Forecast & Valuation Tab (v1.0.0)**:
+- **UI/UX Modernization (v1.1.0)**:
+  - `src/ui/styles.py`: NEW (~350 lines) — Centralized design system
+    - `COLORS` dict: 14-color Midnight Finance palette (dark navy, slate, emerald, rose, indigo, amber, violet)
+    - `get_global_css()`: Full CSS stylesheet injected via `st.markdown` — Google Fonts (Inter), sidebar styling, tabs pill design, metric cards, expanders, buttons, scrollbar, progress bar
+    - `get_plotly_theme()`: Unified dark Plotly layout dict for all charts (surface bg, border grid, themed hover labels)
+    - `metric_card()`: HTML KPI card with accent left-border, delta display, box-shadow
+    - `model_card()`: HTML card with top-accent border for forecast model breakdown
+    - `top_pick_card()`: HTML card with rank badge, ticker, ROIC, score layout
+    - `filter_chip()`: HTML pill badge for sidebar filter summary
+    - `section_header()`: HTML header with accent underline bar
+  - `app.py`: Global CSS injection via `st.markdown`, HTML section headers, styled info banner, card-based Top 5, spacer divs replacing `st.markdown("---")`
+  - `src/ui/sidebar.py`: Custom HTML section headers, collapsed label visibility, filter chips replacing info box, styled sidebar footer with version
+  - `src/ui/components.py`: Custom `metric_card()` HTML replacing `st.metric`, new `render_top_5_cards()` function, styled empty state, HTML header/footer
+  - `src/ui/visualizations.py`: Dark Plotly theme via `get_plotly_theme()`, custom red-amber-green color scale, themed colorbar, dark marker borders
+  - `src/ui/deep_dive.py`: Dark Plotly theme on all 4 chart types, indigo Bollinger band fill, amber ROIC mid-tier color, section headers, spacer divs
+  - `src/ui/forecast_tab.py`: Dark Plotly theme on price target chart, `model_card()` HTML for 3-column breakdown, `metric_card()` for risk dashboard with conditional accent colors (green/amber/red), styled valuation summary cards
+  - `src/utils/config.py`: Chart colors updated to Midnight Finance palette (emerald `#10B981`, rose `#EF4444`, indigo `#6366F1`, violet `#8B5CF6`)
+
+- **Previous: Forecast & Valuation Tab (v1.0.0)**:
   - `src/quant/forecast.py`: NEW (~480 lines) — Multi-model forecasting engine
     - DCF Model: FCF projection with decaying growth, terminal value, WACC via CAPM
     - Earnings Multiple Model: EPS CAGR projection × target P/E (3-year normalized)
@@ -265,6 +283,7 @@ def fetch_ticker_data(ticker: str) -> dict:
 16. ✅ ~~Anti-throttle User-Agent session for yfinance~~
 17. ✅ ~~Concurrent fetching with ThreadPoolExecutor (performance fix)~~
 18. ✅ ~~Forecast & Valuation tab (DCF, Earnings Multiple, ROIC Growth models)~~
+19. ✅ ~~UI/UX Modernization (Midnight Finance dark theme)~~
 
 ### Known Issues
 - FTSE_100 list has 99 tickers (SMDS removed due to acquisition) — add replacement when next constituent is confirmed
@@ -274,6 +293,42 @@ def fetch_ticker_data(ticker: str) -> dict:
 ---
 
 ## Implementation History
+
+### 2026-02-11 (Session 18) - UI/UX Modernization (v1.1.0)
+**New Files Created**:
+- `src/ui/styles.py` (~350 lines) — Centralized "Midnight Finance" design system
+
+**Design System** (`src/ui/styles.py`):
+- **COLORS dict**: 14-color dark palette — bg_primary (#0E1117), surface (#1B2332), surface_elevated (#232F3E), border (#2D3B4E), text_primary (#F0F2F5), text_secondary (#8899A6), text_muted (#5C6B7A), accent_green (#10B981), accent_red (#EF4444), accent_blue (#6366F1), accent_amber (#F59E0B), accent_purple (#8B5CF6)
+- **get_global_css()**: Full CSS injection — Google Fonts (Inter 400-700), sidebar surface bg, tab pill design (active = indigo), metric card borders, expander styling, button gradient (indigo→violet), download/link button hover states, progress bar gradient, custom scrollbar, DataFrame rounded borders
+- **get_plotly_theme()**: Shared dark layout dict — surface bg, border gridlines, themed hover labels, Inter font, secondary text colors for axes/labels
+- **HTML component helpers**: `metric_card()` (accent left-border KPI), `model_card()` (top-accent border), `top_pick_card()` (rank badge + metrics), `filter_chip()` (pill badge), `section_header()` (accent underline bar)
+
+**Files Modified (Style-Only Changes)**:
+- `app.py`: CSS injection at top (`get_global_css()`), HTML section headers, styled info banner replacing emoji st.info, card-based Top 5 via `render_top_5_cards()`, HTML "How to Read" card, spacer divs replacing `st.markdown("---")`
+- `src/ui/sidebar.py`: Custom HTML section headers (uppercase, text-secondary), collapsed label visibility on radio/sliders, `filter_chip()` pills for current thresholds, HTML styled footer with version 1.1.0
+- `src/ui/components.py`: `metric_card()` HTML replacing `st.metric`, new `render_top_5_cards()` function, styled empty state (centered icon + numbered steps), HTML header (no emoji, text gradient), HTML footer (centered, muted, no emoji)
+- `src/ui/visualizations.py`: `get_plotly_theme()` applied, custom color_scale (red→amber→green→light emerald), themed colorbar and marker borders
+- `src/ui/deep_dive.py`: `get_plotly_theme()` on all 4 chart types, indigo Bollinger band fill (rgba 99,102,241), amber color for ROIC 10-15%, `section_header()` replacing `st.subheader`, spacer divs replacing `st.markdown("---")`
+- `src/ui/forecast_tab.py`: `get_plotly_theme()` on price target chart, `model_card()` HTML for 3-column DCF/Earnings/ROIC breakdown, `metric_card()` for all 4 risk metrics with conditional accent (green/amber/red), `metric_card()` for valuation summary, `section_header()` throughout
+- `src/utils/config.py`: Chart colors updated — POSITIVE: #10B981, NEGATIVE: #EF4444, NEUTRAL: #6366F1, BULL: #10B981, BASE: #6366F1, BEAR: #EF4444, MARKET: #8B5CF6
+
+**Design Decisions**:
+- **Dark-first theme**: Matches Streamlit's default dark mode; financial dashboards look more professional on dark backgrounds. Bloomberg Terminal, TradingView, and Linear.app all use dark themes.
+- **Inter font**: Industry standard for data-dense UIs — has tabular numerals, excellent readability at small sizes, widely available via Google Fonts CDN. No new pip dependency.
+- **CSS injection over custom components**: Using `st.markdown(unsafe_allow_html=True)` keeps the stack simple — no JavaScript, no external Streamlit component packages. All styling is pure CSS + inline HTML.
+- **Plotly theme dict pattern**: Single `get_plotly_theme()` function returns a layout dict that all charts call via `fig.update_layout(**theme)`. Ensures visual consistency across 8+ chart types without code duplication.
+- **Conditional accent colors**: Risk dashboard cards use green/amber/red accents based on actual metric values (e.g., beta < 0.8 = green, > 1.3 = red). This is purely cosmetic — no logic changes.
+- **No emojis in UI**: Replaced all emoji prefixes (📈📊✅🔍 etc.) with clean typography. Professional fintech products don't use emojis in navigation or headers.
+- **Pill-shaped filter chips**: Replaced `st.sidebar.info()` filter summary with styled pill badges. More compact, looks like a modern filter UI (think Figma, Linear).
+- **Card-based Top 5**: Replaced plain `st.dataframe` with custom HTML cards featuring rank badges, ROIC, and Value Score. Each card has consistent sizing and hover-ready styling.
+
+**Technical Notes**:
+- Google Fonts CSS loaded via `@import url()` in the injected stylesheet — single HTTP request, cached by browser
+- All HTML components use inline styles (no external CSS classes) for maximum Streamlit compatibility
+- `unsafe_allow_html=True` is required for all `st.markdown()` calls with custom HTML — this is Streamlit's standard pattern for custom styling
+- The `page_icon="📈"` is kept in `st.set_page_config` (browser tab only, not visible in app)
+- Zero new pip dependencies — only uses existing streamlit, plotly, pandas
 
 ### 2026-02-11 (Session 17) - Forecast & Valuation Tab (v1.0.0)
 **New Files Created**:
@@ -989,9 +1044,10 @@ User Input (Tickers)
 - **forecast.py**: Multi-model forecasting (DCF, Earnings Multiple, ROIC Growth), scenario analysis, risk metrics, composite forecasts
 
 #### `src/ui/` (✅ IMPLEMENTED)
+- **styles.py**: Midnight Finance design system (color palette, global CSS, Plotly dark theme, HTML card helpers)
 - **sidebar.py**: Interactive controls (index selector, ROIC/D/E/price sliders, run button, Quant Mentor glossary)
 - **components.py**: Reusable Streamlit widgets (metric cards, data table with tooltips, data quality report)
-- **visualizations.py**: Plotly scatter plot with RdYlGn color scale (ROIC vs Price Discount)
+- **visualizations.py**: Plotly scatter plot with custom color scale (ROIC vs Price Discount)
 - **deep_dive.py**: Per-stock analysis (Bollinger Bands, ROIC/FCF trends, P/E Mean Reversion, due diligence links)
 - **forecast_tab.py**: Forecast & Valuation tab (summary table, price target charts, model breakdown, risk dashboard, assumptions)
 
@@ -1166,5 +1222,5 @@ User Input (Tickers)
 
 ---
 
-**Last Updated**: 2026-02-11 (Session 17 - Forecast & Valuation Tab - v1.0.0)
+**Last Updated**: 2026-02-11 (Session 18 - UI/UX Modernization - v1.1.0)
 **Maintained By**: Claude (Senior Quant Developer)

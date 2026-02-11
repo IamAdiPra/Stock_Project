@@ -6,6 +6,7 @@ Renders index selector, filter sliders, and action button.
 from typing import Dict, Any
 import streamlit as st
 from src.utils.config import MIN_ROIC, MAX_DEBT_EQUITY
+from src.ui.styles import COLORS, filter_chip
 
 
 def render_sidebar() -> Dict[str, Any]:
@@ -22,17 +23,33 @@ def render_sidebar() -> Dict[str, Any]:
             'run_clicked': bool        # True if "Run Screening" button clicked
         }
     """
-    st.sidebar.title("🔍 Stock Screener")
+    # Sidebar title
+    st.sidebar.markdown(
+        f"""<div style="
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: {COLORS['text_primary']};
+            padding: 4px 0 8px 0;
+            letter-spacing: -0.02em;
+        ">Stock Screener</div>""",
+        unsafe_allow_html=True
+    )
+
     st.sidebar.markdown("---")
 
     # ==================== INDEX SELECTION ====================
-    st.sidebar.subheader("📊 Select Index")
+    st.sidebar.markdown(
+        f'<div style="font-size:0.82rem;font-weight:600;color:{COLORS["text_secondary"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Market Index</div>',
+        unsafe_allow_html=True
+    )
 
     index = st.sidebar.radio(
         label="Market",
         options=["Nifty 100", "S&P 500", "FTSE 100"],
         index=0,
-        help="Choose the stock universe to screen"
+        help="Choose the stock universe to screen",
+        label_visibility="collapsed"
     )
 
     # Normalize to internal format
@@ -46,7 +63,11 @@ def render_sidebar() -> Dict[str, Any]:
     st.sidebar.markdown("---")
 
     # ==================== TICKER LIMIT ====================
-    st.sidebar.subheader("🎯 Ticker Limit")
+    st.sidebar.markdown(
+        f'<div style="font-size:0.82rem;font-weight:600;color:{COLORS["text_secondary"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Ticker Limit</div>',
+        unsafe_allow_html=True
+    )
 
     ticker_limit = st.sidebar.slider(
         label="Number of Stocks to Screen",
@@ -55,13 +76,18 @@ def render_sidebar() -> Dict[str, Any]:
         value=100,
         step=10,
         help="Screen only the top N stocks by market capitalization. "
-             "Lower values = faster screening, Higher values = broader coverage."
+             "Lower values = faster screening, Higher values = broader coverage.",
+        label_visibility="collapsed"
     )
 
     st.sidebar.markdown("---")
 
     # ==================== QUALITY FILTERS ====================
-    st.sidebar.subheader("⚙️ Quality Filters")
+    st.sidebar.markdown(
+        f'<div style="font-size:0.82rem;font-weight:600;color:{COLORS["text_secondary"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Quality Filters</div>',
+        unsafe_allow_html=True
+    )
 
     # Min ROIC Slider
     min_roic_pct = st.sidebar.slider(
@@ -91,7 +117,11 @@ def render_sidebar() -> Dict[str, Any]:
     st.sidebar.markdown("---")
 
     # ==================== VALUATION FILTER ====================
-    st.sidebar.subheader("💰 Valuation Filter")
+    st.sidebar.markdown(
+        f'<div style="font-size:0.82rem;font-weight:600;color:{COLORS["text_secondary"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Valuation Filter</div>',
+        unsafe_allow_html=True
+    )
 
     near_low_pct = st.sidebar.slider(
         label="Price Near 52-Week Low (%)",
@@ -106,8 +136,6 @@ def render_sidebar() -> Dict[str, Any]:
     st.sidebar.markdown("---")
 
     # ==================== ACTION BUTTON ====================
-    st.sidebar.subheader("🚀 Execute")
-
     run_clicked = st.sidebar.button(
         label="Run Screening",
         type="primary",
@@ -115,14 +143,16 @@ def render_sidebar() -> Dict[str, Any]:
         help="Fetch data and apply filters to selected index"
     )
 
-    # Display current thresholds summary
+    # Display current thresholds as styled chips
     if not run_clicked:
-        st.sidebar.info(
-            f"**Current Filters:**\n"
-            f"- ROIC ≥ {min_roic_pct}%\n"
-            f"- D/E ≤ {max_de}\n"
-            f"- Price within {near_low_pct}% of 52w Low"
+        chips_html = (
+            f'<div style="margin-top:12px;text-align:center;">'
+            f'{filter_chip(f"ROIC >= {min_roic_pct}%")}'
+            f'{filter_chip(f"D/E <= {max_de}")}'
+            f'{filter_chip(f"Near 52w Low <= {near_low_pct}%")}'
+            f'</div>'
         )
+        st.sidebar.markdown(chips_html, unsafe_allow_html=True)
 
     # ==================== QUANT MENTOR (EDUCATION LAYER) ====================
     st.sidebar.markdown("---")
@@ -193,11 +223,19 @@ def render_sidebar_footer() -> None:
     Displays project version, data source, and help text.
     """
     st.sidebar.markdown("---")
-    st.sidebar.caption("📚 **About**")
-    st.sidebar.caption(
-        "Professional stock screener for value investors. "
-        "Combines fundamental health metrics (ROIC, FCF, D/E) "
-        "with price-action discounting."
+    st.sidebar.markdown(
+        f"""<div style="
+            color: {COLORS['text_muted']};
+            font-size: 0.75rem;
+            line-height: 1.6;
+            padding: 4px 0;
+        ">
+            <div style="font-weight:600;color:{COLORS['text_secondary']};margin-bottom:4px;">About</div>
+            Professional stock screener for value investors.
+            Combines fundamental health metrics (ROIC, FCF, D/E)
+            with price-action discounting.<br><br>
+            <strong>Data:</strong> yfinance&emsp;
+            <strong>Version:</strong> 1.1.0
+        </div>""",
+        unsafe_allow_html=True
     )
-    st.sidebar.caption("**Data Source:** yfinance")
-    st.sidebar.caption("**Version:** 1.0.0")

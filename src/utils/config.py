@@ -77,10 +77,10 @@ MIN_MARKET_CAP: Final[int] = 1_000_000_000  # $1B or ₹1000 Cr
 # Number of stocks to display in results
 DEFAULT_RESULT_LIMIT: Final[int] = 25
 
-# Chart color scheme
-CHART_COLOR_POSITIVE: Final[str] = "#00CC96"  # Green
-CHART_COLOR_NEGATIVE: Final[str] = "#EF553B"  # Red
-CHART_COLOR_NEUTRAL: Final[str] = "#636EFA"   # Blue
+# Chart color scheme (Midnight Finance palette)
+CHART_COLOR_POSITIVE: Final[str] = "#10B981"  # Emerald green
+CHART_COLOR_NEGATIVE: Final[str] = "#EF4444"  # Rose red
+CHART_COLOR_NEUTRAL: Final[str] = "#6366F1"   # Indigo blue
 
 # ==================== FORECASTING CONFIGURATION ====================
 
@@ -107,11 +107,11 @@ TERMINAL_GROWTH_RATE: Final[float] = 0.03  # 3%
 # Maximum allowed growth rate for projections (sanity cap)
 MAX_PROJECTION_GROWTH: Final[float] = 0.30  # 30%
 
-# Forecast scenario chart colors
-CHART_COLOR_BULL: Final[str] = "#00CC96"    # Green
-CHART_COLOR_BASE: Final[str] = "#636EFA"    # Blue
-CHART_COLOR_BEAR: Final[str] = "#EF553B"    # Red
-CHART_COLOR_MARKET: Final[str] = "#AB63FA"  # Purple
+# Forecast scenario chart colors (Midnight Finance palette)
+CHART_COLOR_BULL: Final[str] = "#10B981"    # Emerald green
+CHART_COLOR_BASE: Final[str] = "#6366F1"    # Indigo blue
+CHART_COLOR_BEAR: Final[str] = "#EF4444"    # Rose red
+CHART_COLOR_MARKET: Final[str] = "#8B5CF6"  # Violet purple
 
 # ==================== DATA QUALITY ====================
 
