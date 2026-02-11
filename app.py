@@ -19,6 +19,7 @@ from src.quant.screener import screen_stocks, format_results_for_display
 from src.ui.sidebar import render_sidebar, render_sidebar_footer
 from src.ui.visualizations import create_value_scatter_plot
 from src.ui.deep_dive import render_deep_dive_section
+from src.ui.forecast_tab import render_forecast_section
 from src.ui.components import (
     render_header,
     render_metric_cards,
@@ -63,6 +64,18 @@ def initialize_session_state() -> None:
 
     if 'stocks_data' not in st.session_state:
         st.session_state.stocks_data = None
+
+    if 'forecast_df' not in st.session_state:
+        st.session_state.forecast_df = None
+
+    if 'forecast_data' not in st.session_state:
+        st.session_state.forecast_data = None
+
+    if 'forecast_index' not in st.session_state:
+        st.session_state.forecast_index = None
+
+    if 'forecast_tickers' not in st.session_state:
+        st.session_state.forecast_tickers = None
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -118,24 +131,33 @@ def run_screening(config: Dict[str, Any]) -> None:
     total_tickers = len(tickers)
 
     # Determine exchange suffix
-    exchange = "NSE" if index == "NIFTY100" else None  # None for US markets
+    exchange_map = {"NIFTY100": "NSE", "FTSE100": "LSE"}
+    exchange = exchange_map.get(index)  # None for US markets
 
     # Step 1: Fetch data with progress bar
     with st.spinner(f"📥 Fetching data for {total_tickers} tickers from {index}..."):
         progress_bar = st.progress(0)
         progress_text = st.empty()
 
-        progress_text.text(f"Fetching deep financial data... (This may take 2-5 minutes)")
+        progress_text.text(f"Fetching deep financial data... (0/{total_tickers} tickers)")
+
+        # Progress callback: called from main thread via as_completed()
+        def on_ticker_fetched(completed: int, total: int) -> None:
+            pct = int(completed / total * 70)  # 0-70% for fetching
+            progress_bar.progress(pct)
+            progress_text.text(f"Fetching deep financial data... ({completed}/{total} tickers)")
 
         stocks_data = batch_fetch_deep_data(
             tickers=tickers,
-            exchange=exchange
+            exchange=exchange,
+            max_workers=10,
+            progress_callback=on_ticker_fetched
         )
 
         # Store raw stocks_data for Deep Dive analysis
         st.session_state.stocks_data = stocks_data
 
-        progress_bar.progress(50)
+        progress_bar.progress(75)
         progress_text.text(f"Data fetched. Applying quality filters...")
 
         # Step 2: Screen stocks
@@ -168,6 +190,11 @@ def run_screening(config: Dict[str, Any]) -> None:
         st.session_state.screening_config = config
         st.session_state.total_screened = total_tickers
         st.session_state.passed_filters = len(results_df)
+
+        # Invalidate forecast cache (new screening = new data)
+        st.session_state.forecast_df = None
+        st.session_state.forecast_data = None
+        st.session_state.forecast_tickers = None
 
         # Clear progress indicators
         progress_bar.empty()
@@ -217,7 +244,8 @@ def main() -> None:
         screening_config = st.session_state.screening_config
 
         # Display ticker range info
-        index_name = "Nifty 100" if screening_config['index'] == "NIFTY100" else "S&P 500"
+        index_display_names = {"NIFTY100": "Nifty 100", "SP500": "S&P 500", "FTSE100": "FTSE 100"}
+        index_name = index_display_names.get(screening_config['index'], screening_config['index'])
         st.info(f"🎯 **Screening Top {total_screened} stocks from {index_name} by Market Capitalization**")
 
         # Metric Cards
@@ -231,9 +259,9 @@ def main() -> None:
 
         # Main Results Display
         if not results_df_raw.empty:
-            # Tabbed layout: Screening Results | Deep Dive Analysis
-            tab_results, tab_deep_dive = st.tabs(
-                ["Screening Results", "Deep Dive Analysis"]
+            # Tabbed layout: Screening Results | Deep Dive Analysis | Forecast & Valuation
+            tab_results, tab_deep_dive, tab_forecast = st.tabs(
+                ["Screening Results", "Deep Dive Analysis", "Forecast & Valuation"]
             )
 
             with tab_results:
@@ -278,6 +306,13 @@ def main() -> None:
 
             with tab_deep_dive:
                 render_deep_dive_section(
+                    results_df_raw=results_df_raw,
+                    screening_config=screening_config,
+                    stocks_data=st.session_state.stocks_data,
+                )
+
+            with tab_forecast:
+                render_forecast_section(
                     results_df_raw=results_df_raw,
                     screening_config=screening_config,
                     stocks_data=st.session_state.stocks_data,

@@ -154,8 +154,8 @@ def apply_valuation_filter(
     if df.empty:
         return df
 
-    # Filter: Price near 52-week low
-    df = df[df['near_52w_low'] == True]
+    # Filter: Price within near_low_threshold % of 52-week low
+    df = df[df['distance_from_low'].notna() & (df['distance_from_low'] <= near_low_threshold)]
 
     return df
 

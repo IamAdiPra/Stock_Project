@@ -1,5 +1,5 @@
 """
-Hardcoded ticker lists for Nifty 100 and S&P 500 indices.
+Hardcoded ticker lists for Nifty 100, S&P 500, and FTSE 100 indices.
 These lists are SORTED BY MARKET CAPITALIZATION (descending).
 Lists are stable for MVP and should be updated quarterly.
 """
@@ -17,7 +17,7 @@ NIFTY_100: Final[List[str]] = [
     "ICICIBANK", "BHARTIARTL", "ITC", "SBIN", "LT",
     "BAJFINANCE", "KOTAKBANK", "HCLTECH", "ASIANPAINT", "AXISBANK",
     "MARUTI", "TITAN", "SUNPHARMA", "ULTRACEMCO", "NESTLEIND",
-    "WIPRO", "NTPC", "ONGC", "POWERGRID", "TATAMOTORS",
+    "WIPRO", "NTPC", "ONGC", "POWERGRID", "TMCV",
     "BAJAJFINSV", "TECHM", "ADANIENT", "JSWSTEEL", "DIVISLAB",
     "HINDALCO", "INDUSINDBK", "TATASTEEL", "COALINDIA", "M&M",
     "CIPLA", "DRREDDY", "EICHERMOT", "APOLLOHOSP", "TATACONSUM",
@@ -25,15 +25,15 @@ NIFTY_100: Final[List[str]] = [
     "BAJAJ-AUTO", "SHREECEM", "HDFCLIFE", "UPL", "BPCL",
 
     # Nifty Next 50
-    "ADANIGREEN", "ADANITRANS", "AMBUJACEM", "BANDHANBNK", "BEL",
+    "ADANIGREEN", "ADANIENSOL", "AMBUJACEM", "BANDHANBNK", "BEL",
     "BERGEPAINT", "BOSCHLTD", "CHOLAFIN", "COLPAL", "DABUR",
     "DLF", "GAIL", "GODREJCP", "HAVELLS", "HINDZINC",
     "ICICIPRULI", "INDIGO", "IOC", "JINDALSTEL", "LUPIN",
-    "MARICO", "MCDOWELL-N", "MUTHOOTFIN", "NMDC", "NYKAA",
+    "MARICO", "UNITDSPR", "MUTHOOTFIN", "NMDC", "NYKAA",
     "OFSS", "PAGEIND", "PETRONET", "PIDILITIND", "PNB",
     "RECLTD", "SAIL", "SBICARD", "SIEMENS", "TATAPOWER",
-    "TORNTPHARM", "TRENT", "VEDL", "ZOMATO", "ABCAPITAL",
-    "BANKBARODA", "CANBK", "IDEA", "PFC", "INDUSTOWER",
+    "TORNTPHARM", "TRENT", "VEDL", "ETERNAL", "ABCAPITAL",
+    "BANKBARODA", "CANBK", "LTIM", "PFC", "INDUSTOWER",
     "ICICIGI", "MOTHERSON", "PIIND", "TVSMOTOR", "VOLTAS"
 ]
 
@@ -101,7 +101,7 @@ SP500_FULL: Final[List[str]] = [
     "UBER", "SYK", "DE", "MDLZ", "C",
     "SCHW", "AMAT", "PGR", "TJX", "ADP",
     "VRTX", "ADI", "BSX", "CB", "COP",
-    "LRCX", "MMC", "BMY", "CI", "FI",
+    "LRCX", "MMC", "BMY", "CI",
     "REGN", "GILD", "KLAC", "PANW", "SO",
     "SBUX", "ZTS", "DUK", "CME", "SNPS",
     "TMUS", "CL", "MCK", "SLB", "CDNS",
@@ -136,7 +136,7 @@ SP500_FULL: Final[List[str]] = [
     "CPRT", "CNC", "WEC", "XEL", "PPG",
     "DHI", "CTVA", "STZ", "TFC", "GWW",
     "VLO", "KMI", "EXC", "FTNT", "PWR",
-    "RCL", "ANSS", "MPWR", "HSY", "ROK",
+    "RCL", "MPWR", "HSY", "ROK",
     "AWK", "GLW", "TSCO", "WAB", "FTV",
     "BR", "AVB", "TRGP", "EFX", "URI",
     "VICI", "DLR", "IR", "IRM", "DECK",
@@ -147,9 +147,9 @@ SP500_FULL: Final[List[str]] = [
 
     # --- Mid Cap ($15B-$25B) ---
     "K", "NTAP", "HBAN", "BIIB", "DVN",
-    "LVS", "MTD", "HES", "INTC", "KEYS",
+    "LVS", "MTD", "INTC", "KEYS",
     "EL", "LEN", "NVR", "PHM", "HPQ",
-    "HPE", "GIS", "SYY", "DFS", "MSCI",
+    "HPE", "GIS", "SYY", "MSCI",
     "DPZ", "PEG", "ETR", "AMP", "LYB",
     "GDDY", "AXON", "DDOG", "VST", "GEV",
     "HUM", "FIS", "CAH", "BALL", "SNA",
@@ -200,6 +200,45 @@ SP500_FULL: Final[List[str]] = [
 ]
 
 
+# ==================== FTSE 100 (UK Market) ====================
+# London Stock Exchange - Top 100 companies
+# Last Updated: 2026-02-11
+# Note: .L suffix is HARDCODED on each ticker to prevent US-ticker confusion.
+#       normalize_ticker() will detect the existing suffix and skip appending.
+
+FTSE_100: Final[List[str]] = [
+    # Mega Cap (>£50B market cap)
+    "SHEL.L", "AZN.L", "HSBA.L", "ULVR.L", "BP.L",
+    "GSK.L", "RIO.L", "LSEG.L", "REL.L", "DGE.L",
+
+    # Large Cap (£20B-£50B)
+    "BATS.L", "NG.L", "BA.L", "GLEN.L", "CPG.L",
+    "RKT.L", "III.L", "EXPN.L", "NXT.L", "ABF.L",
+    "AHT.L", "RR.L", "AAL.L", "IMB.L", "ANTO.L",
+    "LLOY.L", "BARC.L", "NWG.L", "STAN.L", "PRU.L",
+
+    # Mid-Large Cap (£10B-£20B)
+    "AV.L", "LGEN.L", "TSCO.L", "SSE.L", "SGE.L",
+    "SGRO.L", "INF.L", "WPP.L", "BNZL.L", "SN.L",
+    "IHG.L", "HLMA.L", "ADM.L", "AUTO.L", "VOD.L",
+    "CCH.L", "SDR.L", "JD.L", "BT-A.L", "MNG.L",
+
+    # Mid Cap (£5B-£10B)
+    "SBRY.L", "RTO.L", "SVT.L", "UU.L", "PSN.L",
+    "TW.L", "BTRW.L", "CRDA.L", "WEIR.L", "SPX.L",
+    "ITRK.L", "RMV.L", "ENT.L", "CNA.L", "IAG.L",
+    "BME.L", "MNDI.L", "PSON.L", "SMIN.L", "PHNX.L",
+
+    # Lower Mid Cap (£3B-£5B)
+    "KGF.L", "WTB.L", "FRAS.L", "HIK.L", "BRBY.L",
+    "EZJ.L", "LAND.L", "DCC.L", "EDV.L",
+    "ICG.L", "BEZ.L", "STJ.L", "HWDN.L", "DPLM.L",
+    "CTEC.L", "UTG.L", "VTY.L", "BKG.L", "FRES.L",
+    "HSX.L", "OCDO.L", "HBR.L", "JMAT.L", "TPK.L",
+    "MKS.L", "ABDN.L", "RS1.L", "PNN.L", "WISE.L",
+]
+
+
 # ==================== HELPER FUNCTIONS ====================
 
 def get_nifty_100() -> List[str]:
@@ -217,12 +256,17 @@ def get_sp500_full() -> List[str]:
     return SP500_FULL.copy()
 
 
+def get_ftse_100() -> List[str]:
+    """Return FTSE 100 ticker list."""
+    return FTSE_100.copy()
+
+
 def get_all_tickers(index: str = "NIFTY100", limit: Optional[int] = None) -> List[str]:
     """
     Get ticker list by index name, optionally limited to top N by market cap.
 
     Args:
-        index: "NIFTY100" or "SP500"
+        index: "NIFTY100", "SP500", or "FTSE100"
         limit: Maximum number of tickers to return (default: all available)
                Takes the top N largest companies by market cap
 
@@ -235,8 +279,10 @@ def get_all_tickers(index: str = "NIFTY100", limit: Optional[int] = None) -> Lis
         tickers = get_nifty_100()
     elif index == "SP500":
         tickers = get_sp500_full()
+    elif index == "FTSE100":
+        tickers = get_ftse_100()
     else:
-        raise ValueError(f"Unknown index: {index}. Use 'NIFTY100' or 'SP500'")
+        raise ValueError(f"Unknown index: {index}. Use 'NIFTY100', 'SP500', or 'FTSE100'")
 
     # Apply limit if specified
     if limit is not None and limit > 0:

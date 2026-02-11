@@ -143,10 +143,79 @@ def fetch_ticker_data(ticker: str) -> dict:
 ## Current Status
 
 ### Version
-**v0.7.0** - Professional Analytics & Education Layer (Phase 3)
+**v1.0.0** - Forecast & Valuation Tab (Multi-Model Quant Engine)
 
 ### Last Implementation
-- **Deep Dive Analysis (v0.7.0)**:
+- **Forecast & Valuation Tab (v1.0.0)**:
+  - `src/quant/forecast.py`: NEW (~480 lines) — Multi-model forecasting engine
+    - DCF Model: FCF projection with decaying growth, terminal value, WACC via CAPM
+    - Earnings Multiple Model: EPS CAGR projection × target P/E (3-year normalized)
+    - ROIC Growth Model: Sustainable growth = reinvestment rate × ROIC
+    - Scenario analysis: Bull (no decay) / Base (linear decay to 3%) / Bear (50% growth)
+    - Risk metrics: Beta, annualized volatility, max drawdown, Sharpe ratio
+    - Composite forecast: Average of available models, market benchmark comparison
+  - `src/ui/forecast_tab.py`: NEW (~380 lines) — Forecast tab UI
+    - Summary table: All filtered stocks with price targets (6mo/1y/2y/5y), alpha, risk
+    - Per-stock detail: Valuation summary cards, 5-year price target chart, model breakdown, risk dashboard, assumptions table
+    - Price target chart: Bull/Base/Bear lines + market benchmark (Plotly)
+  - `src/utils/config.py`: Added RISK_FREE_RATES, EQUITY_RISK_PREMIUM, MARKET_ANNUAL_RETURNS, TERMINAL_GROWTH_RATE, MAX_PROJECTION_GROWTH, scenario chart colors
+  - `app.py`: Third tab "Forecast & Valuation", forecast session state caching, cache invalidation on re-screen
+
+- **Previous: Fix Near 52w Low Filter (v0.9.1)**:
+  - `src/quant/screener.py`: `apply_valuation_filter()` now filters on `distance_from_low <= near_low_threshold` instead of pre-baked boolean
+
+- **Previous: SP500 Delisted Tickers & Rate Limit Resilience (v0.9.0)**:
+  - `src/utils/ticker_lists.py`: Removed ANSS (acquired by Synopsys Jul 2025), HES (acquired by Chevron Jul 2025), DFS (acquired by Capital One May 2025)
+  - `src/data/fetcher.py`: Rate limit detection via `_is_rate_limit_error()` — checks for "rate", "too many requests", "429" in error string
+  - `src/data/fetcher.py`: Exponential backoff for rate limits — 5s, 10s, 20s, 40s, 80s (5 retries vs 3 for normal errors)
+  - `src/data/fetcher.py`: `DEFAULT_MAX_WORKERS` reduced from 10 → 5 to prevent Yahoo throttling on 500-ticker runs
+  - `src/utils/config.py`: Added `RATE_LIMIT_MAX_RETRIES=5`, `RATE_LIMIT_BASE_DELAY=5.0` constants
+  - SP500_FULL: 498 → 495 tickers (3 delisted removed)
+
+- **Previous: SP500 Ticker Fix (v0.8.6)**:
+  - `src/utils/ticker_lists.py`: Removed `FI` from SP500_FULL — Fiserv changed ticker from FI (NYSE) to FISV (Nasdaq) in Nov 2025; FISV already existed in both SP500_TOP100 and SP500_FULL
+
+- **Previous: NIFTY Ticker Fixes (v0.8.5)**:
+  - `src/utils/ticker_lists.py`: TATAMOTORS → TMCV (Tata Motors demerged Oct 2025 into TMCV.NS commercial vehicles + TMPV.NS passenger vehicles; TMCV is larger by mcap)
+  - `src/utils/ticker_lists.py`: ZOMATO → ETERNAL (Zomato renamed to Eternal Limited, Mar 2025; ZOMATO.NS is dead on yfinance)
+
+- **Previous: FTSE Ticker Fixes & Error Logging Cleanup (v0.8.4)**:
+  - `src/ui/deep_dive.py`: Fixed FTSE100 exchange mapping — was falling through to NYSE, causing dot-to-dash conversion (RMV.L → RMV-L)
+  - `src/utils/ticker_lists.py`: BTR.L → BTRW.L (Barratt Redrow renamed), ICP.L → ICG.L (Intermediate Capital Group correct ticker)
+  - `src/data/fetcher.py`: Refactored `_retry_fetch()` to log ONCE after all retries exhausted (was logging per-attempt, causing 3x duplicate entries)
+  - `src/data/fetcher.py`: Moved all `log_data_issue()` calls out of inner `_fetch()` functions into `_retry_fetch()` via `failure_message` parameter
+  - `src/ui/sidebar.py`: Version bumped to 0.8.4
+
+- **Previous: yfinance curl_cffi Compatibility Fix (v0.8.3)**:
+  - `src/data/fetcher.py`: Removed custom `requests.Session` (`get_yahoo_session()`) entirely
+  - `src/data/fetcher.py`: Removed `import requests`, `import threading`, `_thread_local` storage
+  - `src/data/fetcher.py`: All 6 `yf.Ticker()` calls now use default session (no `session=` param)
+  - Root cause: yfinance v1.1.0 switched from `requests` to `curl_cffi` for HTTP
+  - Fix: Let yfinance manage its own `curl_cffi` session internally
+
+- **Previous: Concurrent Fetching (v0.8.2)**:
+  - `src/data/fetcher.py`: `batch_fetch_deep_data()` uses `ThreadPoolExecutor(max_workers=10)`
+  - `src/data/fetcher.py`: `batch_fetch_data()` also parallelized with same pattern
+  - `src/data/fetcher.py`: Thread-local sessions via `threading.local()` (replaces global singleton)
+  - `src/data/fetcher.py`: `progress_callback` parameter for real-time UI updates
+  - `app.py`: Per-ticker progress bar ("Fetching... 47/100 tickers") with 0-70% range
+  - Expected: ~60-90 seconds for 100 tickers (was 10+ minutes sequential)
+
+- **Previous: FTSE Ticker Hardening & Anti-Throttle (v0.8.1)**:
+  - ALL FTSE tickers hardcoded with `.L` suffix; BDEV → BTR.L, ICAG → IAG.L, SMDS removed
+  - Anti-throttle browser User-Agent session for all yf.Ticker() calls
+
+- **Previous: Maintenance & FTSE 100 Expansion (v0.8.0)**:
+  - `src/utils/ticker_lists.py`: ADANITRANS → ADANIENSOL, MCDOWELL-N → UNITDSPR, IDEA → LTIM
+  - `src/data/fetcher.py`: Empty data returns handled silently (no log spam for FI etc.)
+  - `src/utils/ticker_lists.py`: NEW `FTSE_100` list, `get_ftse_100()`, `get_all_tickers()` supports "FTSE100"
+  - `src/ui/sidebar.py`: "FTSE 100" radio button option added
+  - `src/utils/config.py`: GBP currency (£), LSE exchange suffix, FTSE100 due diligence URLs
+  - `app.py`: Exchange mapping and display name for FTSE100
+  - `src/data/validator.py`: DELETED (dead code)
+  - `src/data/fetcher.py`: Removed duplicate `fetch_complete_data`
+
+- **Previous: Deep Dive Analysis (v0.7.0)**:
   - `src/ui/deep_dive.py`: NEW - Interactive per-stock analysis module
     - 1-year candlestick chart with Bollinger Bands (20-day SMA ± 2 std dev)
     - 3-year ROIC trend bar chart with 15% baseline reference
@@ -188,13 +257,359 @@ def fetch_ticker_data(ticker: str) -> dict:
 8. ✅ ~~Implement main app.py orchestrator~~
 9. ✅ ~~Phase 3: Professional Analytics & Education Layer~~
 10. Test full screening on Nifty 100 / S&P 500 in production
+11. ✅ ~~Fix broken tickers (ADANITRANS, MCDOWELL-N, LTI/MINDTREE)~~
+12. ✅ ~~Add FTSE 100 (UK Market) support~~
+13. ✅ ~~Code cleanup (dead validator.py, duplicate fetch_complete_data)~~
+14. Test full screening on FTSE 100 in production
+15. ✅ ~~FTSE ticker hardening (hardcode .L suffix, fix BDEV/ICAG/SMDS)~~
+16. ✅ ~~Anti-throttle User-Agent session for yfinance~~
+17. ✅ ~~Concurrent fetching with ThreadPoolExecutor (performance fix)~~
+18. ✅ ~~Forecast & Valuation tab (DCF, Earnings Multiple, ROIC Growth models)~~
 
 ### Known Issues
-None
+- FTSE_100 list has 99 tickers (SMDS removed due to acquisition) — add replacement when next constituent is confirmed
+- SP500_FULL has 495 tickers (FI, ANSS, HES, DFS removed — acquisitions/delistings)
+- CBOE and NDAQ may show "Balance sheet data unavailable" — financial exchanges have non-standard statement formats
 
 ---
 
 ## Implementation History
+
+### 2026-02-11 (Session 17) - Forecast & Valuation Tab (v1.0.0)
+**New Files Created**:
+- `src/quant/forecast.py` (~480 lines) — Multi-model forecasting engine
+- `src/ui/forecast_tab.py` (~380 lines) — Forecast tab UI rendering
+
+**Forecasting Engine** (`src/quant/forecast.py`):
+- **Model 1: Simplified DCF**
+  - `calculate_fcf_cagr()`: 3-year FCF compound annual growth rate
+  - `calculate_wacc()`: CAPM-based cost of equity + debt-weighted WACC
+  - `calculate_dcf_valuation()`: Project FCF 5 years → terminal value → PV → intrinsic value/share
+  - Net debt subtracted from enterprise value for equity value
+  - Horizon prices: converge from current to intrinsic (10%/20%/40%/100% at 6mo/1y/2y/5y)
+
+- **Model 2: Earnings Multiple**
+  - `calculate_eps_cagr()`: 3-year EPS growth rate
+  - `calculate_earnings_multiple_valuation()`: Project EPS × target P/E at each horizon
+  - Target P/E priority: 3-year normalized > forwardPE > trailingPE
+
+- **Model 3: ROIC Growth**
+  - `calculate_roic_growth_valuation()`: Sustainable growth = reinvestment_rate × ROIC
+  - Reinvestment rate from payoutRatio, default 60%
+  - Project earnings at sustainable growth, apply trailing P/E
+
+- **Scenario Analysis** (`_apply_scenario_growth()`):
+  - Bull: Historical growth maintained, capped at 30%
+  - Base: Linear decay from historical to 3% terminal growth over 5 years
+  - Bear: 50% of historical growth, same decay pattern
+
+- **Risk Metrics** (`calculate_risk_metrics()`):
+  - Beta (from yfinance, default 1.0)
+  - Annual volatility: std(daily returns) × sqrt(252)
+  - Max drawdown: worst peak-to-trough over 1 year
+  - Sharpe ratio: (projected return - risk_free) / volatility
+
+- **Composite** (`calculate_composite_forecast()`):
+  - Runs all 3 models × 3 scenarios per stock
+  - Composite = average of available models (graceful None handling)
+  - Alpha = stock projected 1Y return - market expected 1Y return
+
+**Forecast UI** (`src/ui/forecast_tab.py`):
+- Summary table: Ticker, Price, DCF Value, Margin of Safety, 6mo/1y/2y/5y targets, Alpha, Beta, Vol
+- Per-stock detail (selectbox):
+  - Valuation summary: 4 metric cards (price, DCF, earnings, margin of safety)
+  - 5-year price target chart: Bull/Base/Bear + Market benchmark lines (Plotly)
+  - Model breakdown: 3-column DCF/Earnings/ROIC with key inputs and outputs
+  - Risk dashboard: Beta, Volatility, Max Drawdown, Sharpe as metric cards
+  - Assumptions table: All model inputs (Rf, ERP, WACC, growth rates, P/E, etc.)
+
+**Config Additions** (`src/utils/config.py`):
+- `RISK_FREE_RATES`: India 7.0%, US 4.5%, UK 4.5%
+- `EQUITY_RISK_PREMIUM`: 5.5% global
+- `MARKET_ANNUAL_RETURNS`: Nifty 12%, S&P 10%, FTSE 8%
+- `TERMINAL_GROWTH_RATE`: 3% GDP proxy
+- `MAX_PROJECTION_GROWTH`: 30% cap
+- `CHART_COLOR_BULL/BASE/BEAR/MARKET`: Scenario chart colors
+
+**App Changes** (`app.py`):
+- Third tab: "Forecast & Valuation"
+- Session state: `forecast_df`, `forecast_data`, `forecast_index`, `forecast_tickers`
+- Forecast cache invalidated on re-screening
+
+**Design Decisions**:
+- **No new API calls**: All valuation models use data already in `stocks_data` (session state).
+  Historical prices for volatility use `fetch_historical_prices` (cached 24h).
+- **Graceful degradation**: Each model returns None independently. Composite averages
+  whatever models succeed. Stocks with 0 successful models show "insufficient data".
+- **Convergence-based DCF horizons**: Rather than complex intermediate DCF recalculations,
+  price converges linearly from current to intrinsic over time (10%→20%→40%→100%).
+  Pragmatic approximation that avoids over-engineering.
+- **Growth decay**: Base case decays historical growth toward GDP (3%) over 5 years.
+  Prevents unrealistic extrapolation of high short-term growth rates.
+- **30% growth cap**: Even bull case capped at 30% CAGR. Prevents absurd projections
+  from stocks with temporarily explosive growth.
+- **Default beta 1.0**: Stocks without yfinance beta (rare for large-caps) default to
+  market-average risk. Better than failing the entire model.
+- **Forecast caching**: Computed once per screening run, stored in session state.
+  Invalidated when new screening runs. Per-stock selectbox doesn't re-compute.
+
+### 2026-02-11 (Session 16) - Fix Near 52w Low Filter Ignoring User Threshold (v0.9.1)
+**Bug Fix** (`src/quant/screener.py`):
+- **Symptom**: Changing "Price Near 52w Low" slider from 10% to 20% produced identical results
+- **Root Cause**: Two-part disconnect between user's slider value and actual filtering:
+  1. `calculate_all_metrics()` in `metrics.py:581` hardcoded `is_near_52w_low(data, threshold_pct=10.0)` —
+     the `near_52w_low` boolean was always baked at 10% regardless of user input
+  2. `apply_valuation_filter()` in `screener.py:158` filtered on `df['near_52w_low'] == True` —
+     ignoring its own `near_low_threshold` parameter entirely
+- **Fix**: Replaced boolean filter with numeric comparison:
+  - Old: `df[df['near_52w_low'] == True]`
+  - New: `df[df['distance_from_low'].notna() & (df['distance_from_low'] <= near_low_threshold)]`
+- `distance_from_low` (% above 52w low) was already computed correctly in `calculate_all_metrics()`
+- No changes needed upstream — `app.py` and `screen_stocks()` already passed the threshold correctly
+
+**Design Decision**:
+- Used existing `distance_from_low` numeric column rather than threading threshold through
+  `calculate_all_metrics()` — cleaner, avoids modifying the metrics API surface
+- `near_52w_low` boolean and `is_near_52w_low()` function left intact as informational fields
+
+### 2026-02-11 (Session 15) - SP500 Delisted Tickers & Rate Limit Resilience (v0.9.0)
+**Delisted Tickers Removed (S&P 500)**:
+- `ANSS` → removed: Ansys acquired by Synopsys, delisted from Nasdaq Jul 17, 2025
+- `HES` → removed: Hess acquired by Chevron, delisted from NYSE Jul 18, 2025
+- `DFS` → removed: Discover Financial acquired by Capital One, delisted from NYSE May 19, 2025
+- SP500_FULL: 498 → 495 tickers
+
+**Rate Limit Resilience** (`src/data/fetcher.py`):
+- Problem: Full SP500 (498 tickers) with 10 concurrent workers triggered Yahoo "Too Many Requests"
+  after ~350 tickers. 10 workers × 5 API calls/ticker = ~50 in-flight requests at peak.
+- Added `_is_rate_limit_error()`: Detects rate limit exceptions ("rate", "too many requests", "429")
+- `_retry_fetch()` now uses exponential backoff for rate limits:
+  - Normal errors: 3 retries, 2s fixed delay
+  - Rate limit errors: 5 retries, exponential backoff (5s, 10s, 20s, 40s, 80s)
+  - On first rate limit hit, retry count automatically upgrades from 3 → 5
+- `DEFAULT_MAX_WORKERS` reduced: 10 → 5 (halved in-flight requests)
+- New config constants in `src/utils/config.py`:
+  - `RATE_LIMIT_MAX_RETRIES = 5`
+  - `RATE_LIMIT_BASE_DELAY = 5.0` (seconds, doubles each attempt)
+
+**Design Decisions**:
+- **5 workers default**: 5 × 5 = ~25 in-flight requests — well within Yahoo's tolerance
+  even for 500-ticker runs. Trade-off: ~2x slower than 10 workers (~120-180s vs 60-90s)
+  but dramatically fewer rate limit failures
+- **Exponential backoff**: Rate limits are global (per-IP), so waiting longer gives the
+  server time to reset. Doubling pattern (5→10→20→40→80) provides up to 155s total wait
+- **Auto-upgrade retry count**: When a rate limit is first detected, retry count silently
+  increases from 3 to 5 — more chances to recover without changing normal error handling
+
+### 2026-02-11 (Session 14) - SP500 Ticker Fix (v0.8.6)
+**Ticker Fix (S&P 500)**:
+- `FI` → removed: Fiserv changed ticker from FI (NYSE) to FISV (Nasdaq) effective Nov 11, 2025
+- `FISV` already existed in both SP500_TOP100 (line 73) and SP500_FULL (line 112)
+- Simply removed the stale `FI` entry from SP500_FULL to eliminate duplicate
+- SP500_FULL: 499 → 498 tickers (498 unique)
+
+### 2026-02-11 (Session 13) - NIFTY Ticker Fixes (v0.8.5)
+**Ticker Fixes (NIFTY 100)**:
+- `TATAMOTORS` → `TMCV`: Tata Motors demerged in October 2025 into two entities:
+  - `TMCV.NS` — Tata Motors Limited (Commercial Vehicles), mcap ~₹1.8T
+  - `TMPV.NS` — Tata Motors Passenger Vehicles Limited, mcap ~₹1.4T
+  - Old `TATAMOTORS.NS` returns 404 from yfinance (dead ticker)
+  - Chose TMCV as replacement (larger entity, retains the "Tata Motors" name)
+- `ZOMATO` → `ETERNAL`: Zomato renamed to Eternal Limited in March 2025
+  - `ZOMATO.NS` returns `quoteType: NONE` with no price/financial data
+  - `ETERNAL.NS` is the active ticker, mcap ~₹2.7T
+
+**Technical Notes**:
+- Both corporate actions happened in 2025 (before our project started) but yfinance
+  retained stale mappings until recently
+- TATAMOTORS.NS now redirects to TATAMOTOR.NS which itself says "SEE <TATAMOTORS.NS>" — circular redirect, completely broken
+- NSE website still uses ZOMATO as symbol, but Yahoo Finance migrated to ETERNAL
+
+### 2026-02-11 (Session 12) - FTSE Ticker Fixes & Error Logging Cleanup (v0.8.4)
+**Bug Fixes**:
+- **RMV.L → RMV-L Deep Dive bug** (`src/ui/deep_dive.py`):
+  - Root cause: `exchange` mapping only knew NIFTY100→NSE, everything else fell to `None`
+  - `None` triggered `exchange or "NYSE"` → NYSE → dot-to-dash conversion on `.L` tickers
+  - Fix: Added `exchange_map = {"NIFTY100": "NSE", "FTSE100": "LSE"}` dict lookup
+  - Now FTSE tickers like RMV.L are passed correctly to `fetch_historical_prices()`
+
+- **BTR.L → BTRW.L** (`src/utils/ticker_lists.py`):
+  - Barratt Redrow completed corporate rename; BTR.L returns no data from yfinance
+  - Correct Yahoo Finance ticker is now BTRW.L
+
+- **ICP.L → ICG.L** (`src/utils/ticker_lists.py`):
+  - Intermediate Capital Group's correct Yahoo Finance ticker is ICG.L, not ICP.L
+  - ICP.L returns no data (empty .info, no financial statements)
+
+**Error Logging Refactor** (`src/data/fetcher.py`):
+- Problem: Every data issue logged 3x (once per retry attempt) — `_fetch()` inner functions
+  called `log_data_issue()` directly, and `_retry_fetch()` called them 3 times
+- Fix: Moved ALL `log_data_issue()` calls out of inner `_fetch()` functions
+- `_retry_fetch()` now accepts `failure_message` parameter and logs ONCE after exhausting retries
+- Two log paths: `last_error` (exception) → "Max retries exceeded: {error}", or
+  `None` return → custom `failure_message` (e.g., "Income statement data unavailable")
+- Result: Data Quality Report now shows 1 entry per issue instead of 3
+
+**Version**: Sidebar bumped to 0.8.4
+
+### 2026-02-11 (Session 11) - yfinance curl_cffi Compatibility Fix (v0.8.3)
+**Root Cause**:
+- yfinance v1.1.0 replaced `requests` with `curl_cffi` for HTTP internals
+- Our custom `requests.Session` (added in v0.8.1 for anti-throttle User-Agent) is now rejected
+- Error: "Yahoo API requires curl_cffi session not `<class 'requests.sessions.Session'>`"
+- ALL tickers on ALL markets affected (100% fetch failure rate)
+
+**Changes to `src/data/fetcher.py`**:
+- Removed `import requests` and `import threading`
+- Removed `_thread_local = threading.local()` thread-local storage
+- Removed `get_yahoo_session()` function entirely (~20 lines)
+- Removed `session=get_yahoo_session()` from all 6 `yf.Ticker()` calls:
+  - `fetch_fundamental_data()`, `fetch_price_data()`, `fetch_historical_prices()`
+  - `fetch_income_statement()`, `fetch_balance_sheet()`, `fetch_cashflow_statement()`
+- ThreadPoolExecutor concurrency preserved (unaffected by session removal)
+
+**Design Decisions**:
+- **Let yfinance manage sessions**: yfinance v1.1.0 uses `curl_cffi` internally with its own
+  session management. Custom sessions are no longer needed or supported.
+- **No replacement anti-throttle**: `curl_cffi` mimics browser TLS fingerprints natively,
+  which is more effective than a User-Agent header alone. Throttling protection is now built-in.
+- **Thread safety**: yfinance's internal session handling works with ThreadPoolExecutor.
+  Verified: SHEL.L, RELIANCE.NS, AAPL all fetch correctly without custom session.
+
+**Technical Notes**:
+- yfinance v1.1.0 installed in .venv (breaking change from earlier versions)
+- `requests` no longer imported (was transitive dependency, still available but unused)
+- `threading` no longer imported (`concurrent.futures` handles thread pool independently)
+- Tested: FTSE (SHEL.L), NIFTY (RELIANCE.NS), SP500 (AAPL) — all returning data correctly
+
+### 2026-02-11 (Session 10) - Concurrent Fetching & Performance Restoration (v0.8.2)
+**Performance Fix**:
+- Root cause: `batch_fetch_deep_data` was a sequential loop — 100 tickers × 5 HTTP calls = 500 serial requests
+- The custom `requests.Session` removed yfinance internal connection reuse, compounding latency
+- Solution: `ThreadPoolExecutor(max_workers=10)` with `as_completed()` pattern
+
+**Changes to `src/data/fetcher.py`**:
+- Added imports: `threading`, `concurrent.futures.ThreadPoolExecutor`, `as_completed`
+- `get_yahoo_session()`: Now uses `threading.local()` for thread-local sessions (was global singleton)
+  - Each worker thread gets its own `requests.Session` with browser User-Agent
+  - Thread-safe: no shared session state between concurrent fetches
+- `batch_fetch_deep_data()`: Rewrote with ThreadPoolExecutor
+  - `max_workers=10`: 10 tickers fetched concurrently
+  - `progress_callback`: Optional `Callable[[int, int], None]` for UI updates
+  - Per-future exception handling: one failed ticker doesn't crash the batch
+- `batch_fetch_data()`: Same parallel pattern applied
+- Added `DEFAULT_MAX_WORKERS = 10` module constant
+
+**Changes to `app.py`**:
+- `run_screening()`: New `on_ticker_fetched()` callback updates progress bar per-ticker
+  - Progress range 0-70% for fetch phase (was static 0→50% jump)
+  - Text shows "Fetching... (47/100 tickers)" for user visibility
+  - Callback runs in main Streamlit thread via `as_completed()` — safe for UI updates
+
+**Design Decisions**:
+- **10 workers**: 10 concurrent tickers × 5 requests each = ~50 in-flight HTTP requests
+  Conservative enough to avoid Yahoo Finance rate-limiting
+  Aggressive enough for ~8-10x speedup over sequential
+- **Thread-local sessions**: `requests.Session` is NOT thread-safe per docs
+  `threading.local()` gives each worker its own session + connection pool
+  Avoids shared-state corruption while preserving per-thread connection reuse
+- **as_completed() for progress**: Yields futures in the calling (main) thread
+  Safe to call `st.progress()` and `st.empty().text()` from there
+  No need for thread-safe queue or lock for Streamlit UI updates
+
+**Technical Notes**:
+- `st.cache_data` is internally thread-safe (uses locks) — cached functions work from worker threads
+- `threading`, `concurrent.futures` are stdlib — no new dependencies
+- `typing.Callable` used for progress_callback type hint (Python 3.9 compatible)
+- Expected performance: ~60-90 seconds for 100 tickers (vs 10+ minutes sequential)
+
+### 2026-02-11 (Session 9) - FTSE Ticker Hardening & Anti-Throttle Session (v0.8.1)
+**FTSE 100 Ticker Fixes**:
+- Hardcoded `.L` suffix on ALL FTSE_100 tickers (was relying on normalize_ticker)
+- `BDEV` → `BTR.L` (Barratt Developments renamed to Barratt Redrow)
+- `ICAG` → `IAG.L` (correct Yahoo Finance ticker for International Airlines Group)
+- `SMDS` (DS Smith) REMOVED — undergoing acquisition, returning unstable data
+- List now has 99 tickers (down from 100)
+
+**Anti-Throttle Session**:
+- Added `import requests` to fetcher.py
+- Added `get_yahoo_session()` — module-level singleton `requests.Session`
+- Browser User-Agent header: Chrome/91.0 on Windows 10
+- All 6 `yf.Ticker()` calls now pass `session=get_yahoo_session()`:
+  - `fetch_fundamental_data()`, `fetch_price_data()`, `fetch_historical_prices()`
+  - `fetch_income_statement()`, `fetch_balance_sheet()`, `fetch_cashflow_statement()`
+- Fixes intermittent "Incomplete Data" / "Fetch Failure" for valid NSE stocks
+
+**Design Decisions**:
+- **Hardcoded .L suffix**: Prevents ambiguity where bare tickers (BA, AAL, RR) could be
+  confused with US tickers. normalize_ticker() detects existing .L and skips appending.
+  Trade-off: FTSE list format differs from NIFTY/SP500, but eliminates a class of bugs.
+
+- **Singleton session pattern**: Single `requests.Session` reused across all fetches.
+  Avoids creating new sessions per-ticker (connection pooling benefits).
+  Module-level `_yahoo_session` initialized lazily on first call.
+
+- **SMDS removal without replacement**: Preferred data integrity over round-number list size.
+  Will add replacement when next FTSE 100 constituent is confirmed.
+
+**Technical Notes**:
+- `requests` is already a transitive dependency of `yfinance` — no new pip install needed
+- User-Agent string uses Chrome 91 (widely recognized, low blocking risk)
+- Session singleton is NOT thread-safe, but Streamlit runs single-threaded per user
+- Python 3.9.13 compatibility maintained
+
+### 2026-02-11 (Session 8) - Maintenance, Data Quality & FTSE 100 Expansion (v0.8.0)
+**Ticker Fixes (NIFTY 100)**:
+- `ADANITRANS` → `ADANIENSOL` (Adani Energy Solutions renamed)
+- `MCDOWELL-N` → `UNITDSPR` (United Spirits renamed)
+- `IDEA` → `LTIM` (Vodafone Idea removed, LTIMindtree added from LTI/MINDTREE merger)
+- `TATAMOTORS` and `ZOMATO`: Confirmed correct, .NS suffix auto-applied by normalize_ticker()
+
+**Ticker Fixes (S&P 500)**:
+- `FI`: Kept in list. Modified `fetch_fundamental_data()` to return None silently for empty data
+  instead of calling `log_data_issue()` — prevents Data Quality Report spam
+- Note: `FISV` (actual Fiserv ticker) already present in both SP500_TOP100 and SP500_FULL
+
+**FTSE 100 (New Market)**:
+- Added `FTSE_100` list: 100 UK stocks sorted by market cap (SHEL, AZN, HSBA, ... WISE)
+  - Tickers stored WITHOUT .L suffix (normalize_ticker adds it when exchange="LSE")
+  - 5 tiers: Mega Cap (>£50B), Large Cap, Mid-Large Cap, Mid Cap, Lower Mid Cap
+- Added `get_ftse_100()` helper function
+- Updated `get_all_tickers()` to accept "FTSE100" index key
+- Sidebar: Added "FTSE 100" radio button via index_map dict (replaced if/else)
+- Config: `CURRENCY_CONFIG["FTSE100"]` = £/GBP
+- Config: `EXCHANGE_SUFFIXES["LSE"]` = ".L"
+- Config: `DUE_DILIGENCE_URLS["FTSE100"]` for Yahoo Finance
+- App: `exchange_map` dict for NSE/LSE/None routing
+- App: `index_display_names` dict for UI display
+
+**Code Cleanup**:
+- Deleted `src/data/validator.py` (150 lines) — zero imports across entire codebase
+- Removed duplicate `fetch_complete_data()` in fetcher.py (lines 323-354 shadowed lines 187-218)
+
+**Design Decisions**:
+- **FTSE tickers without .L suffix**: Consistent with NIFTY pattern (normalize_ticker adds suffix)
+  - normalize_ticker("SHEL", "LSE") → "SHEL.L"
+  - normalize_ticker("BT-A", "LSE") → "BT-A.L"
+  - No dot-to-dash conversion for LSE (only applies to NYSE/NASDAQ/None)
+
+- **IDEA → LTIM replacement**: Vodafone Idea is no longer Nifty 100 constituent (~small cap)
+  - Frees slot for LTIMindtree which is a major IT company
+  - Maintains NIFTY_100 at exactly 100 entries
+
+- **Silent empty data handling**: Removed log_data_issue() call for empty yfinance returns
+  - Tickers like FI consistently return empty — logging every time clutters Data Quality Report
+  - Retry logic still logs actual fetch failures (network errors, timeouts)
+
+- **index_map dict in sidebar**: Replaced if/else chain with dict lookup
+  - Cleaner, extensible pattern for adding future markets
+  - Same pattern used for exchange_map and index_display_names in app.py
+
+**Technical Notes**:
+- FTSE_100 list should be updated quarterly as index constituents change
+- Some FTSE tickers share symbols with US tickers (BA=BAE Systems vs Boeing, AAL=Anglo American vs American Airlines) — no conflict since different exchange suffixes
+- Python 3.9.13 compatibility maintained (typing.Final, typing.List, typing.Optional)
+- Version bumped to 0.8.0 in sidebar footer
 
 ### 2026-02-10 (Session 7) - Professional Analytics & Education Layer (v0.7.0)
 **New Files Created**:
@@ -561,22 +976,24 @@ User Input (Tickers)
 #### `src/data/` (✅ IMPLEMENTED)
 - **fetcher.py**: yfinance API wrapper with retry logic, ticker normalization, financial statement fetching
 - **cache.py**: Dual TTL caching decorators (24h fundamentals, 1h price)
-- **validator.py**: Data quality validation, field sanitization
+- ~~**validator.py**~~: DELETED in v0.8.0 (unused dead code)
 
 #### `src/utils/` (✅ IMPLEMENTED)
 - **config.py**: Application constants (cache TTL, thresholds, exchange suffixes)
 - **logger.py**: In-memory data quality issue tracking for UI display
-- **ticker_lists.py**: Nifty 100 and S&P 500 ticker lists
+- **ticker_lists.py**: Nifty 100, S&P 500, and FTSE 100 ticker lists
 
 #### `src/quant/` (✅ IMPLEMENTED)
 - **metrics.py**: NOPAT-based ROIC, 3-year FCF validation, D/E ratio, value score calculation
 - **screener.py**: Strict filtering pipeline, ranking algorithm, display formatting
+- **forecast.py**: Multi-model forecasting (DCF, Earnings Multiple, ROIC Growth), scenario analysis, risk metrics, composite forecasts
 
 #### `src/ui/` (✅ IMPLEMENTED)
 - **sidebar.py**: Interactive controls (index selector, ROIC/D/E/price sliders, run button, Quant Mentor glossary)
 - **components.py**: Reusable Streamlit widgets (metric cards, data table with tooltips, data quality report)
 - **visualizations.py**: Plotly scatter plot with RdYlGn color scale (ROIC vs Price Discount)
 - **deep_dive.py**: Per-stock analysis (Bollinger Bands, ROIC/FCF trends, P/E Mean Reversion, due diligence links)
+- **forecast_tab.py**: Forecast & Valuation tab (summary table, price target charts, model breakdown, risk dashboard, assumptions)
 
 ---
 
@@ -741,13 +1158,13 @@ User Input (Tickers)
 
 ## Future Enhancements (Backlog)
 - [ ] Add sector-based peer comparison
-- [ ] Implement DCF (Discounted Cash Flow) valuation model
-- [ ] Export results to CSV/Excel
+- [x] ~~Implement DCF (Discounted Cash Flow) valuation model~~ (v1.0.0)
+- [x] ~~Export results to CSV/Excel~~ (forecast CSV export in v1.0.0)
 - [ ] Add historical performance backtesting
-- [ ] Multi-threading for parallel ticker fetching
+- [x] ~~Multi-threading for parallel ticker fetching~~ (v0.8.2)
 - [ ] Database layer for persistent storage (SQLite/PostgreSQL)
 
 ---
 
-**Last Updated**: 2026-02-10 (Session 7 - Professional Analytics & Education Layer - v0.7.0)
+**Last Updated**: 2026-02-11 (Session 17 - Forecast & Valuation Tab - v1.0.0)
 **Maintained By**: Claude (Senior Quant Developer)

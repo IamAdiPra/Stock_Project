@@ -84,7 +84,8 @@ def render_deep_dive_section(
 
     # Derive exchange and currency
     index = screening_config.get('index', 'SP500')
-    exchange = "NSE" if index == "NIFTY100" else None
+    exchange_map = {"NIFTY100": "NSE", "FTSE100": "LSE"}
+    exchange = exchange_map.get(index)
     currency_symbol = get_currency_symbol(index)
     normalized = normalize_ticker(selected_ticker, exchange=exchange or "NYSE")
 

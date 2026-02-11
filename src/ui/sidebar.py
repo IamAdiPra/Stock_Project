@@ -30,13 +30,18 @@ def render_sidebar() -> Dict[str, Any]:
 
     index = st.sidebar.radio(
         label="Market",
-        options=["Nifty 100", "S&P 500"],
+        options=["Nifty 100", "S&P 500", "FTSE 100"],
         index=0,
         help="Choose the stock universe to screen"
     )
 
     # Normalize to internal format
-    index_key = "NIFTY100" if index == "Nifty 100" else "SP500"
+    index_map = {
+        "Nifty 100": "NIFTY100",
+        "S&P 500": "SP500",
+        "FTSE 100": "FTSE100",
+    }
+    index_key = index_map[index]
 
     st.sidebar.markdown("---")
 
@@ -195,4 +200,4 @@ def render_sidebar_footer() -> None:
         "with price-action discounting."
     )
     st.sidebar.caption("**Data Source:** yfinance")
-    st.sidebar.caption("**Version:** 0.7.0")
+    st.sidebar.caption("**Version:** 1.0.0")
