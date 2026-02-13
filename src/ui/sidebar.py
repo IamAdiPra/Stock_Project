@@ -114,6 +114,18 @@ def render_sidebar() -> Dict[str, Any]:
              "Lower values indicate conservative financial leverage."
     )
 
+    # Min Earnings Quality Score Slider (optional, default 0 = disabled)
+    min_earnings_quality = st.sidebar.slider(
+        label="Min Earnings Quality Score",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=5,
+        help="Filter stocks by earnings quality (0-100). "
+             "0 = disabled. Higher scores indicate cash-backed, high-quality earnings. "
+             "Combines accrual ratio, FCF/NI ratio, and revenue/receivables divergence."
+    )
+
     st.sidebar.markdown("---")
 
     # ==================== VALUATION FILTER ====================
@@ -135,6 +147,23 @@ def render_sidebar() -> Dict[str, Any]:
 
     st.sidebar.markdown("---")
 
+    # ==================== MOMENTUM ====================
+    st.sidebar.markdown(
+        f'<div style="font-size:0.82rem;font-weight:600;color:{COLORS["text_secondary"]};'
+        f'text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Momentum</div>',
+        unsafe_allow_html=True
+    )
+
+    use_hybrid_ranking = st.sidebar.checkbox(
+        label="Hybrid Ranking (Value + Momentum)",
+        value=False,
+        help="Blend 70% Value Score + 30% Momentum Score for ranking. "
+             "Momentum is computed from RSI, MACD, and SMA crossover signals "
+             "for stocks that pass all value filters."
+    )
+
+    st.sidebar.markdown("---")
+
     # ==================== ACTION BUTTON ====================
     run_clicked = st.sidebar.button(
         label="Run Screening",
@@ -145,11 +174,15 @@ def render_sidebar() -> Dict[str, Any]:
 
     # Display current thresholds as styled chips
     if not run_clicked:
+        eq_chip = f'{filter_chip(f"EQ >= {min_earnings_quality}")}' if min_earnings_quality > 0 else ""
+        hybrid_chip = f'{filter_chip("Hybrid Ranking")}' if use_hybrid_ranking else ""
         chips_html = (
             f'<div style="margin-top:12px;text-align:center;">'
             f'{filter_chip(f"ROIC >= {min_roic_pct}%")}'
             f'{filter_chip(f"D/E <= {max_de}")}'
             f'{filter_chip(f"Near 52w Low <= {near_low_pct}%")}'
+            f'{eq_chip}'
+            f'{hybrid_chip}'
             f'</div>'
         )
         st.sidebar.markdown(chips_html, unsafe_allow_html=True)
@@ -165,6 +198,8 @@ def render_sidebar() -> Dict[str, Any]:
         'min_roic': min_roic,
         'max_de': max_de,
         'near_low_pct': near_low_pct,
+        'min_earnings_quality': min_earnings_quality,
+        'use_hybrid_ranking': use_hybrid_ranking,
         'run_clicked': run_clicked
     }
 
@@ -210,9 +245,53 @@ def render_quant_mentor() -> None:
             "Above = potentially overvalued."
         )
         st.markdown(
+            "**Earnings Quality (0-100)**\n"
+            "How trustworthy are the reported earnings? Combines three signals: "
+            "Accrual Ratio (cash vs reported income), "
+            "FCF/Net Income (cash conversion), and "
+            "Revenue vs Receivables growth (collection health). "
+            "Above 70 = High quality. Below 40 = Caution."
+        )
+        st.markdown(
             "**52-Week High/Low**\n"
             "The highest and lowest prices over the past year. "
             "Stocks near 52-week lows with strong fundamentals = potential value opportunities."
+        )
+        st.markdown(
+            "**RSI** (Relative Strength Index)\n"
+            "Measures speed/magnitude of recent price changes (0-100). "
+            "Below 30 = oversold, Above 70 = overbought. "
+            "For value investors, RSI 30-55 is the sweet spot (recovering, not overheated)."
+        )
+        st.markdown(
+            "**MACD** (Moving Average Convergence Divergence)\n"
+            "Shows the relationship between two moving averages of price. "
+            "MACD above signal line = bullish momentum. "
+            "Histogram shows the gap — growing histogram = strengthening trend."
+        )
+        st.markdown(
+            "**Golden Cross / Death Cross**\n"
+            "Golden Cross: 50-day SMA crosses above 200-day SMA (bullish trend). "
+            "Death Cross: 50-day crosses below 200-day (bearish trend). "
+            "Widely followed by institutional traders."
+        )
+        st.markdown(
+            "**Momentum Score (0-100)**\n"
+            "Composite of RSI (35%), MACD (35%), and SMA crossover (30%). "
+            "Higher = stronger upward momentum. "
+            "Hybrid Ranking blends 70% Value Score + 30% Momentum Score."
+        )
+        st.markdown(
+            "**Sector Analysis**\n"
+            "Groups stocks by GICS sector (Technology, Healthcare, Financials, etc.) "
+            "to show sector-level aggregates. The treemap sizes sectors by market cap "
+            "and colors by average ROIC. The sector-relative view shows whether a "
+            "filtered stock outperforms or underperforms its sector median.\n\n"
+            "**Peer Comparison**\n"
+            "In Deep Dive, compares a stock against 5-8 peers from the same sector/industry. "
+            "The radar chart normalizes 5 dimensions (ROIC, Capital Efficiency, Scale, "
+            "Earnings Quality, Price Discount) to 0-100 within the peer group. "
+            "Outward = stronger on that dimension."
         )
 
 
@@ -235,7 +314,7 @@ def render_sidebar_footer() -> None:
             Combines fundamental health metrics (ROIC, FCF, D/E)
             with price-action discounting.<br><br>
             <strong>Data:</strong> yfinance&emsp;
-            <strong>Version:</strong> 1.1.0
+            <strong>Version:</strong> 1.6.0
         </div>""",
         unsafe_allow_html=True
     )

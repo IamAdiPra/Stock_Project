@@ -8,13 +8,13 @@ from typing import Optional, List, Dict, Any
 import pandas as pd
 import numpy as np
 
-from src.quant.metrics import _extract_value, calculate_roic
+from src.quant.metrics import _extract_value, calculate_roic, validate_metric_bounds
 from src.utils.config import (
     RISK_FREE_RATES,
-    EQUITY_RISK_PREMIUM,
     MARKET_ANNUAL_RETURNS,
-    TERMINAL_GROWTH_RATE,
     MAX_PROJECTION_GROWTH,
+    get_terminal_growth_rate,
+    get_equity_risk_premium,
 )
 
 
@@ -34,7 +34,7 @@ def _apply_scenario_growth(
     scenario: str,
     year: int,
     total_years: int = PROJECTION_YEARS,
-    terminal_growth: float = TERMINAL_GROWTH_RATE,
+    terminal_growth: float = 0.03,
     max_growth: float = MAX_PROJECTION_GROWTH,
 ) -> float:
     """
@@ -172,7 +172,7 @@ def calculate_wacc(
     balance_sheet: Optional[pd.DataFrame],
     income_statement: Optional[pd.DataFrame],
     risk_free_rate: float = 0.045,
-    equity_risk_premium: float = EQUITY_RISK_PREMIUM,
+    equity_risk_premium: float = 0.05,
 ) -> Optional[float]:
     """
     Calculate Weighted Average Cost of Capital using CAPM.
@@ -263,8 +263,8 @@ def calculate_dcf_valuation(
     balance_sheet: Optional[pd.DataFrame],
     income_statement: Optional[pd.DataFrame],
     risk_free_rate: float = 0.045,
-    equity_risk_premium: float = EQUITY_RISK_PREMIUM,
-    terminal_growth: float = TERMINAL_GROWTH_RATE,
+    equity_risk_premium: float = 0.05,
+    terminal_growth: float = 0.03,
     scenario: str = "base",
 ) -> Optional[Dict[str, Any]]:
     """
@@ -384,6 +384,7 @@ def calculate_earnings_multiple_valuation(
     data: dict,
     income_statement: Optional[pd.DataFrame],
     scenario: str = "base",
+    terminal_growth: float = 0.03,
 ) -> Optional[Dict[str, Any]]:
     """
     Earnings multiple (P/E) based price projection.
@@ -468,7 +469,7 @@ def calculate_earnings_multiple_valuation(
         # For fractional years, use fractional growth
         growth = _apply_scenario_growth(eps_cagr, scenario,
                                         year=max(1, int(h)),
-                                        terminal_growth=TERMINAL_GROWTH_RATE)
+                                        terminal_growth=terminal_growth)
         projected_eps = current_eps * (1 + growth) ** h
         price_target = projected_eps * target_pe
         horizon_prices[label] = price_target
@@ -491,6 +492,7 @@ def calculate_roic_growth_valuation(
     balance_sheet: Optional[pd.DataFrame],
     cashflow_statement: Optional[pd.DataFrame],
     scenario: str = "base",
+    terminal_growth: float = 0.03,
 ) -> Optional[Dict[str, Any]]:
     """
     ROIC-based sustainable growth model.
@@ -552,7 +554,7 @@ def calculate_roic_growth_valuation(
     for label, h in zip(HORIZON_LABELS, HORIZONS):
         growth = _apply_scenario_growth(sustainable_growth, scenario,
                                         year=max(1, int(h)),
-                                        terminal_growth=TERMINAL_GROWTH_RATE)
+                                        terminal_growth=terminal_growth)
         projected_eps = current_eps * (1 + growth) ** h
         price_target = projected_eps * target_pe
         horizon_prices[label] = price_target
@@ -702,6 +704,8 @@ def calculate_composite_forecast(
         return None
 
     risk_free = RISK_FREE_RATES.get(index, 0.045)
+    terminal_growth = get_terminal_growth_rate(index)
+    erp = get_equity_risk_premium(index)
 
     # Run all 3 models in all 3 scenarios
     scenarios = ["bull", "base", "bear"]
@@ -713,13 +717,23 @@ def calculate_composite_forecast(
     for sc in scenarios:
         dcf_results[sc] = calculate_dcf_valuation(
             data, cashflow_statement, balance_sheet, income_statement,
-            risk_free_rate=risk_free, scenario=sc,
+            risk_free_rate=risk_free, equity_risk_premium=erp,
+            terminal_growth=terminal_growth, scenario=sc,
         )
         earnings_results[sc] = calculate_earnings_multiple_valuation(
             data, income_statement, scenario=sc,
+            terminal_growth=terminal_growth,
         )
         roic_results[sc] = calculate_roic_growth_valuation(
-            data, income_statement, balance_sheet, cashflow_statement, scenario=sc,
+            data, income_statement, balance_sheet, cashflow_statement,
+            scenario=sc, terminal_growth=terminal_growth,
+        )
+
+    # Validate FCF CAGR from base DCF result
+    ticker = data.get('symbol', data.get('ticker', 'UNKNOWN'))
+    if dcf_results.get("base") is not None:
+        validate_metric_bounds(
+            ticker, "fcf_cagr", dcf_results["base"].get("fcf_cagr")
         )
 
     # Check at least one model succeeded for base scenario

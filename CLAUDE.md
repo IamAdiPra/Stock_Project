@@ -29,7 +29,7 @@
 
 ### Virtual Environment
 - **Active Environment**: `.venv` (local)
-- **Python Version**: [TBD - to be verified]
+- **Python Version**: 3.9.13+
 - **Activation Command**:
   ```bash
   .\.venv\Scripts\activate  # Windows
@@ -143,10 +143,134 @@ def fetch_ticker_data(ticker: str) -> dict:
 ## Current Status
 
 ### Version
-**v1.1.0** - UI/UX Modernization (Midnight Finance Theme)
+**v1.6.0** - Peer Comparison Panel
 
 ### Last Implementation
-- **UI/UX Modernization (v1.1.0)**:
+- **Peer Comparison Panel (v1.6.0)**:
+  - `src/ui/deep_dive.py`: NEW function `_get_sector_peers()` — finds 5-8 peers from `universe_df`, same industry first then sector, sorted by market cap proximity. Computes earnings_quality_score and distance_from_high for each peer via `calculate_all_metrics()`.
+  - `src/ui/deep_dive.py`: NEW function `render_peer_comparison_section()` — orchestrator rendering comparison table + radar chart for selected stock vs peers.
+  - `src/ui/deep_dive.py`: NEW function `_render_peer_table()` — Streamlit DataFrame with selected stock highlighted as first row, columns: Ticker, Company, ROIC, D/E, Market Cap, EQ Score.
+  - `src/ui/deep_dive.py`: NEW function `_create_peer_radar_chart()` — Plotly `Scatterpolar` with 5 normalized axes (ROIC, Capital Efficiency, Scale, Earnings Quality, Price Discount). Selected stock = filled emerald polygon, sector median = dashed gray polygon.
+  - `src/ui/deep_dive.py`: `render_deep_dive_section()` — new `universe_df` parameter (optional), peer comparison section rendered between Earnings Quality and Due Diligence links.
+  - `src/utils/config.py`: Added `PEER_COMPARISON_COUNT = 7` constant.
+  - `app.py`: Passes `universe_df=st.session_state.universe_df` to `render_deep_dive_section()`.
+  - `src/ui/sidebar.py`: Added "Peer Comparison" entry to Quant Mentor glossary. Version bumped to 1.6.0.
+  - `src/ui/components.py`: Footer version bumped to 1.6.0.
+
+- **Previous: Sector Analysis Tab (v1.5.0)**:
+  - `src/quant/screener.py`: `screen_stocks()` now extracts `sector` and `industry` from each stock's yfinance data dict and includes them in the result DataFrame
+  - `src/quant/screener.py`: NEW function `build_sector_universe()` — builds a DataFrame of ALL stocks (pre-filter) with ticker, company_name, sector, industry, market_cap, current_price, roic, debt_to_equity. Used for sector analysis where the full universe is needed.
+  - `src/ui/sector_tab.py`: NEW FILE (~300 lines) — Sector Analysis tab UI
+  - `src/ui/sector_tab.py`: `render_sector_section()` — main entry point with 3 metric cards (sectors count, top sector, universe size) + 4 visualization sections
+  - `src/ui/sector_tab.py`: `_build_sector_aggregates()` — groups universe by GICS sector, computes avg ROIC, avg D/E, total market cap, filtered stock count per sector
+  - `src/ui/sector_tab.py`: `create_sector_treemap()` — Plotly treemap sized by market cap, colored by avg ROIC (green-amber-red scale), hover shows all sector metrics
+  - `src/ui/sector_tab.py`: `create_sector_comparison_chart()` — horizontal bar chart of avg ROIC per sector, sorted descending, with 15% Buffett baseline reference line
+  - `src/ui/sector_tab.py`: `render_sector_metrics_table()` — Streamlit DataFrame with Sector, Stocks, Avg ROIC, Avg D/E, Total Market Cap, Passed Filters columns
+  - `src/ui/sector_tab.py`: `create_sector_relative_chart()` — diverging bar chart showing each filtered stock's ROIC minus its sector median (green = outperforms, red = underperforms)
+  - `src/utils/config.py`: Added `SECTOR_TREEMAP_COLOR_SCALE` — 4-stop color scale (red→amber→green→light emerald) for treemap ROIC coloring
+  - `app.py`: 4th tab "Sector Analysis" added alongside Screening Results, Deep Dive, Forecast
+  - `app.py`: `build_sector_universe()` called after `screen_stocks()`, stored in `st.session_state.universe_df`
+  - `app.py`: New session state key `universe_df` initialized and invalidated on re-screening
+  - `src/ui/sidebar.py`: Added "Sector Analysis" entry to Quant Mentor glossary
+  - `src/ui/sidebar.py`: Version bumped to 1.5.0
+  - `src/ui/components.py`: Footer version bumped to 1.5.0
+
+- **Previous: Momentum Signals (v1.4.0)**:
+  - `src/utils/config.py`: Added `RSI_PERIOD=14`, `MACD_FAST=12`, `MACD_SLOW=26`, `MACD_SIGNAL=9`, `SMA_SHORT_PERIOD=50`, `SMA_LONG_PERIOD=200` indicator parameters
+  - `src/utils/config.py`: Added `MOMENTUM_WEIGHTS` dict — RSI 35%, MACD 35%, SMA 30%
+  - `src/utils/config.py`: Added `HYBRID_VALUE_WEIGHT=0.70`, `HYBRID_MOMENTUM_WEIGHT=0.30` for optional hybrid ranking blend
+  - `src/quant/metrics.py`: NEW function `calculate_rsi()` — Wilder RSI (14-day EMA smoothing), returns 0-100
+  - `src/quant/metrics.py`: NEW function `calculate_macd()` — returns current MACD line, signal line, histogram
+  - `src/quant/metrics.py`: NEW function `calculate_sma_crossover()` — returns SMA50, SMA200, price, golden_cross bool
+  - `src/quant/metrics.py`: NEW function `_score_rsi()` — value-investor tuned: peak at RSI 40-55, penalizes overbought (>70) and deeply oversold (<20)
+  - `src/quant/metrics.py`: NEW function `_score_macd()` — normalizes histogram to price, maps [-2%, +2%] to [0, 100]
+  - `src/quant/metrics.py`: NEW function `_score_sma()` — +30 price>SMA50, +30 price>SMA200, +40 golden cross
+  - `src/quant/metrics.py`: NEW function `calculate_momentum_score()` — orchestrator returning raw indicators + composite 0-100 score (weighted avg of available components)
+  - `src/quant/metrics.py`: NEW function `calculate_momentum_indicators()` — full time-series DataFrame for chart overlays (RSI, MACD, MACD_Signal, MACD_Histogram, SMA_50, SMA_200)
+  - `src/quant/screener.py`: NEW function `compute_momentum_scores()` — fetches 2y historical prices for filtered stocks, computes per-stock momentum score
+  - `src/quant/screener.py`: NEW function `compute_hybrid_scores()` — blends value_score (0.7) + momentum rank-percentile (0.3)
+  - `src/quant/screener.py`: `screen_stocks()` accepts `use_hybrid_ranking` parameter (default False), calls momentum after value scoring
+  - `src/quant/screener.py`: `rank_by_value_score()` accepts `score_column` parameter for flexible ranking (value_score or hybrid_score)
+  - `src/quant/screener.py`: `format_results_for_display()` adds `momentum_score_fmt` column (integer string)
+  - `src/ui/sidebar.py`: New "Hybrid Ranking (Value + Momentum)" checkbox under Momentum section (default off)
+  - `src/ui/sidebar.py`: Filter chip shown when hybrid ranking enabled
+  - `src/ui/sidebar.py`: Config returns `use_hybrid_ranking: bool`
+  - `src/ui/sidebar.py`: Added RSI, MACD, Golden Cross, and Momentum Score entries to Quant Mentor glossary
+  - `src/ui/components.py`: Added `momentum_score_fmt` column to results table with tooltip
+  - `src/ui/deep_dive.py`: `create_price_bollinger_chart()` refactored — accepts optional `price_df_2y` parameter, adds SMA 50 (amber) and SMA 200 (purple) overlay lines
+  - `src/ui/deep_dive.py`: NEW function `create_momentum_chart()` — 2-row Plotly subplot (RSI with 30/70 zones, MACD with histogram bars)
+  - `src/ui/deep_dive.py`: NEW function `render_momentum_section()` — chart + 3 metric cards (Momentum Score, RSI value, SMA crossover status)
+  - `src/ui/deep_dive.py`: `render_deep_dive_section()` fetches 2y data once, passes to both Bollinger and momentum charts
+  - `app.py`: Threads `use_hybrid_ranking` from sidebar config through to `screen_stocks()`
+
+- **Previous: Earnings Quality Score (v1.3.0)**:
+  - `src/utils/config.py`: Added `EARNINGS_QUALITY_WEIGHTS` dict — accrual_ratio 40%, fcf_to_ni 35%, rev_rec_divergence 25%
+  - `src/quant/metrics.py`: NEW function `calculate_earnings_quality()` — computes three sub-metrics and a composite 0-100 score:
+    - Accrual Ratio: (Net Income - Operating Cash Flow) / Total Assets (lower = better)
+    - FCF-to-NI Ratio: Free Cash Flow / Net Income (higher = better, >1.0 = gold standard)
+    - Revenue vs Receivables Growth Divergence: Revenue growth - Receivables growth (positive = healthy)
+  - `src/quant/metrics.py`: 3 scoring helpers `_score_accrual_ratio()`, `_score_fcf_to_ni()`, `_score_rev_rec_divergence()` — linear interpolation to 0-100
+  - `src/quant/metrics.py`: 3 computation helpers `_compute_accrual_ratio()`, `_compute_fcf_to_ni_ratio()`, `_compute_rev_rec_divergence()`
+  - `src/quant/metrics.py`: `calculate_all_metrics()` calls `calculate_earnings_quality(data)`, adds `'earnings_quality_score'` key to return dict
+  - `src/quant/screener.py`: NEW function `apply_earnings_quality_filter()` — optional filter (None scores pass, 0 = disabled)
+  - `src/quant/screener.py`: `screen_stocks()` accepts `min_earnings_quality` parameter (default 0), applied between quality filters and valuation filter
+  - `src/quant/screener.py`: `format_results_for_display()` formats score as integer string in `earnings_quality_fmt` column
+  - `src/ui/sidebar.py`: New "Min Earnings Quality Score" slider (0-100, default 0, step 5) under Quality Filters section
+  - `src/ui/sidebar.py`: Filter chip for EQ threshold shown when > 0
+  - `src/ui/sidebar.py`: Added "Earnings Quality" entry to Quant Mentor glossary
+  - `src/ui/components.py`: `render_results_table()` — added `'earnings_quality_fmt'` column with "EQ Score" header and tooltip
+  - `src/ui/deep_dive.py`: NEW function `render_earnings_quality_section()` — gauge chart + 3 component metric cards
+  - `src/ui/deep_dive.py`: NEW function `create_earnings_quality_gauge()` — Plotly `go.Indicator` gauge (green 70-100, amber 40-70, red 0-40)
+  - `src/ui/deep_dive.py`: Integrated between P/E chart and Due Diligence links
+  - `app.py`: Threads `min_earnings_quality` from config through to `screen_stocks()`
+
+- **Previous: Confidence Level Badges (v1.2.3)**:
+  - `src/quant/metrics.py`: NEW function `calculate_data_confidence()` — assesses data completeness per stock, returns "High"/"Medium"/"Low"
+    - High: All 3 financial statements present with 3+ years of data + beta available
+    - Medium: All 3 statements present but missing beta or any statement has < 3 years
+    - Low: Any financial statement missing entirely
+  - `src/quant/metrics.py`: `calculate_all_metrics()` calls `calculate_data_confidence(data)`, adds `'confidence'` key to return dict
+  - `src/ui/components.py`: `render_results_table()` — added `'confidence'` to display columns with educational tooltip
+  - `src/ui/components.py`: `render_top_5_cards()` — passes confidence value to `top_pick_card()`
+  - `src/ui/styles.py`: `top_pick_card()` — new optional `confidence` parameter, renders colored label under ticker (green=High, amber=Medium, red=Low)
+  - `src/ui/sidebar.py`: Version bumped to 1.2.3
+  - `src/ui/components.py`: Footer version bumped to 1.2.3
+
+- **Previous: Metric Sanity Bounds (v1.2.2)**:
+  - `src/utils/config.py`: Added `METRIC_SANITY_BOUNDS` dict — ROIC (-50% to 100%), D/E (0 to 50x), P/E (0 to 200x), FCF CAGR (-50% to 200%)
+  - `src/quant/metrics.py`: NEW function `validate_metric_bounds()` — checks value against bounds, logs `"validation_error"` to Data Quality Report
+  - `src/quant/metrics.py`: `calculate_all_metrics()` validates ROIC, D/E, and trailing P/E per stock
+  - `src/quant/forecast.py`: `calculate_composite_forecast()` validates FCF CAGR from base DCF result
+  - Flagged issues appear automatically in existing Data Quality Report UI (no UI changes needed)
+
+- **Previous: Market-Specific Terminal Growth & ERP (v1.2.1)**:
+  - `src/utils/config.py`: Replaced scalar `TERMINAL_GROWTH_RATE=0.03` with `TERMINAL_GROWTH_RATES` dict (India 5%, US 3%, UK 2.5%)
+  - `src/utils/config.py`: Replaced scalar `EQUITY_RISK_PREMIUM=0.055` with `EQUITY_RISK_PREMIUMS` dict (India 7.5%, US 5.0%, UK 5.5%)
+  - `src/utils/config.py`: Added `get_terminal_growth_rate(index)` and `get_equity_risk_premium(index)` helper functions
+  - `src/quant/forecast.py`: `calculate_composite_forecast()` now looks up market-specific terminal growth and ERP, passes to all 3 models
+  - `src/quant/forecast.py`: `calculate_earnings_multiple_valuation()` — added `terminal_growth` parameter (was hardcoded)
+  - `src/quant/forecast.py`: `calculate_roic_growth_valuation()` — added `terminal_growth` parameter (was hardcoded)
+  - `src/quant/forecast.py`: Default parameter values on `_apply_scenario_growth()`, `calculate_wacc()`, `calculate_dcf_valuation()` changed from config imports to plain floats (US defaults) for backward compatibility
+  - `src/ui/forecast_tab.py`: Assumptions table, DCF model card, and scenario caption now display market-specific values
+  - `src/ui/forecast_tab.py`: `render_model_breakdown()` now accepts `index` parameter
+
+- **Previous: Fix Value Score Normalization (v1.2.0)**:
+  - `src/quant/screener.py`: NEW function `compute_rank_percentile_scores()` — both ROIC and discount components normalized to 0–1 via `pd.Series.rank(pct=True)` within the filtered universe, then weighted 60/40. Replaces per-stock absolute normalization.
+  - `src/quant/screener.py`: `screen_stocks()` pipeline updated — calls `compute_rank_percentile_scores()` between valuation filter and ranking
+  - `src/quant/metrics.py`: `calculate_all_metrics()` no longer calls `calculate_value_score()` — sets `value_score=None` (computed post-filtering in screener)
+  - `src/utils/config.py`: Added `VALUE_SCORE_ROIC_WEIGHT=0.6`, `VALUE_SCORE_DISCOUNT_WEIGHT=0.4` constants
+  - `src/ui/visualizations.py`: Bubble size multiplier changed from `*20` to `*40` (compensates for new 0–1 score range)
+  - Value Score range changed from ~0.5–4.0+ to 0.0–1.0
+
+- **Previous: Fix ROIC Negative Invested Capital (v1.1.1)**:
+  - `src/quant/metrics.py`: `calculate_roic_for_year()` — added fallback capital employed calculation when primary `Invested Capital = Total Debt + Total Equity - Cash` goes negative (cash-rich companies like Apple, Google, Indian IT)
+    - Fallback: `Capital Employed = Total Assets - Current Liabilities` (standard Bloomberg/Morningstar definition)
+    - If both methods produce IC <= 0, returns None
+    - Added ROIC cap at 100% (`ROIC_CAP`) — prevents absurd values from near-zero denominators
+    - Fix propagates to `calculate_roic_trend()` automatically (calls `calculate_roic_for_year()`)
+  - `src/utils/config.py`: Added `ROIC_CAP: Final[float] = 1.0` constant in SCREENING THRESHOLDS section
+
+- **Previous: UI/UX Modernization (v1.1.0)**:
   - `src/ui/styles.py`: NEW (~350 lines) — Centralized design system
     - `COLORS` dict: 14-color Midnight Finance palette (dark navy, slate, emerald, rose, indigo, amber, violet)
     - `get_global_css()`: Full CSS stylesheet injected via `st.markdown` — Google Fonts (Inter), sidebar styling, tabs pill design, metric cards, expanders, buttons, scrollbar, progress bar
@@ -284,6 +408,10 @@ def fetch_ticker_data(ticker: str) -> dict:
 17. ✅ ~~Concurrent fetching with ThreadPoolExecutor (performance fix)~~
 18. ✅ ~~Forecast & Valuation tab (DCF, Earnings Multiple, ROIC Growth models)~~
 19. ✅ ~~UI/UX Modernization (Midnight Finance dark theme)~~
+20. ✅ ~~Confidence Level Badges (per-stock data completeness indicator)~~
+21. ✅ ~~Momentum Signals (RSI/MACD/SMA with composite score and hybrid ranking)~~
+22. ✅ ~~Sector Analysis Tab (treemap, comparison bars, summary table, sector-relative ROIC)~~
+23. ✅ ~~Peer Comparison Panel (Deep Dive table + radar chart vs sector median)~~
 
 ### Known Issues
 - FTSE_100 list has 99 tickers (SMDS removed due to acquisition) — add replacement when next constituent is confirmed
@@ -293,6 +421,318 @@ def fetch_ticker_data(ticker: str) -> dict:
 ---
 
 ## Implementation History
+
+### 2026-02-13 (Session 25) - Peer Comparison Panel (v1.6.0)
+**Enhancement** (`src/ui/deep_dive.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`, `src/ui/components.py`):
+- **Problem**: Deep Dive analyzed stocks in isolation. A user could see ROIC, D/E, earnings quality for one stock but had zero context for how those metrics compare to peers in the same sector/industry. A 20% ROIC in a sector where peers average 30% tells a different story than 20% in a 12% sector — this peer context was completely missing from the per-stock view.
+- **Fix**: Added a Peer Comparison section in the Deep Dive tab between Earnings Quality and Due Diligence links. Shows a comparison table (selected stock + 7 peers) and a radar/spider chart comparing the stock's normalized profile against the sector median across 5 dimensions.
+
+**Peer Selection Logic** (`_get_sector_peers()`):
+- First tries same **industry** from `universe_df` (most granular GICS match)
+- If fewer than 5 industry peers, expands to same **sector**
+- Sorts candidates by market cap proximity (absolute difference) to the selected stock
+- Takes top 7 peers (configurable via `PEER_COMPARISON_COUNT` in config.py)
+- Computes `earnings_quality_score` and `distance_from_high` for each peer on-the-fly via `calculate_all_metrics()` from in-memory `stocks_data` (~10ms for 7 stocks, zero API calls)
+
+**Comparison Table** (`_render_peer_table()`):
+- Selected stock as first row (marked "(Selected)" in Company column)
+- Peer rows sorted by market cap proximity
+- Columns: Ticker, Company, ROIC (%), D/E, Market Cap, EQ Score
+- Streamlit `st.dataframe` with column configs and tooltips
+
+**Radar Chart** (`_create_peer_radar_chart()`):
+- 5 axes, all min-max normalized to 0-100 within the stock+peers group:
+  - **ROIC**: Raw ROIC, higher = outward
+  - **Capital Efficiency**: `1/(1+D/E)`, lower debt = outward
+  - **Scale**: `log10(market_cap)`, larger = outward
+  - **Earnings Quality**: Raw 0-100 score
+  - **Price Discount**: `abs(distance_from_high)`, bigger drop from 52w high = outward
+- Selected stock: filled emerald polygon (`rgba(16, 185, 129, 0.15)` fill, 2.5px solid line)
+- Sector median: dashed gray polygon computed from peer values (median, not mean)
+- Plotly `Scatterpolar` with dark theme, horizontal legend below chart
+- Graceful handling: if < 2 values exist for normalization, defaults to 50 (center)
+
+**Config Addition** (`src/utils/config.py`):
+- `PEER_COMPARISON_COUNT: Final[int] = 7`
+
+**App Integration** (`app.py`):
+- `render_deep_dive_section()` call now passes `universe_df=st.session_state.universe_df`
+
+**UI Updates**:
+- `sidebar.py`: New "Peer Comparison" entry in Quant Mentor glossary. Version bumped to 1.6.0.
+- `components.py`: Footer version bumped to 1.6.0.
+
+**Design Decisions**:
+- **Industry-first, sector-fallback**: Industry (e.g., "Semiconductors") is much more meaningful for comparison than broad sector (e.g., "Technology"). But some industries have < 5 stocks in the universe, so sector is the fallback to ensure a useful peer set.
+- **Market cap proximity sorting**: Comparing Apple to a $2B tech company is less useful than comparing Apple to Microsoft. Sorting by market cap distance ensures the most relevant peers (similar business scale) appear.
+- **Min-max normalization over rank-percentile**: With only 8 data points (1 stock + 7 peers), rank-percentile produces coarse steps (0, 14, 28...). Min-max gives smooth, intuitive positioning.
+- **Capital Efficiency = 1/(1+D/E)**: Directly using D/E would make "outward = more debt" (counterintuitive). The reciprocal transform makes outward = less leveraged. The `1+D/E` avoids division by zero for debt-free companies (D/E=0 → efficiency=1.0).
+- **Log-scale market cap**: Raw market cap spans orders of magnitude ($5B vs $3T). Log10 compresses the range to make the radar axis meaningful. Without it, a $3T company would push all others to zero on the Scale axis.
+- **Median for sector reference, not mean**: Consistent with sector-relative ROIC in the Sector Analysis tab. Median resists outlier influence — one 80% ROIC outlier doesn't skew the radar baseline.
+- **No new API calls**: All data comes from `universe_df` (already built) and `stocks_data` (already fetched). `calculate_all_metrics()` only does CPU computation on in-memory financial statements.
+- **Optional `universe_df` parameter**: `render_deep_dive_section()` accepts `universe_df=None` with graceful fallback. Ensures backward compatibility if peer comparison data isn't available.
+
+### 2026-02-13 (Session 24) - Sector Analysis Tab (v1.5.0)
+**Enhancement** (`src/quant/screener.py`, `src/ui/sector_tab.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`, `src/ui/components.py`):
+- **Problem**: The screener evaluated stocks individually with zero sector context. Users couldn't see which sectors dominated their screened universe, how filtered stocks compared to sector peers, or whether their selection was dangerously sector-concentrated. A stock with 20% ROIC looks impressive in isolation, but if its sector median is 25%, it's actually a laggard — this nuance was invisible.
+- **Fix**: Added a 4th tab "Sector Analysis" with treemap visualization (market cap sizing, ROIC coloring), sector comparison bar chart, summary table, and sector-relative ROIC diverging chart for filtered stocks.
+
+**Data Source**: yfinance `.info` dict already provides `sector` and `industry` (GICS classification) for every stock. No new API calls needed — data was already fetched during `batch_fetch_deep_data()` but never extracted.
+
+**New File** (`src/ui/sector_tab.py`, ~300 lines):
+- `render_sector_section(universe_df, results_df_raw, screening_config)` — main entry point: 3 summary metric cards (sectors count, top sector by ROIC, universe size with filtered count) + 4 visualization sections.
+- `_build_sector_aggregates(universe_df, results_df_raw)` — groups by GICS sector, computes stock_count, avg_roic, avg_de, total_market_cap, filtered_count per sector. Excludes "Unknown" sector if real sectors exist. Sorts by avg_roic descending.
+- `create_sector_treemap(sector_agg, currency_symbol)` — Plotly `go.Treemap` with rectangles sized by total market cap, colored by avg ROIC using `SECTOR_TREEMAP_COLOR_SCALE`. Labels show sector name + stock count + avg ROIC. Hover includes all 5 aggregate metrics.
+- `create_sector_comparison_chart(sector_agg)` — Horizontal bar chart of avg ROIC per sector, sorted ascending (best at top). Color-coded: green (>15%), amber (10-15%), red (<10%). 15% Buffett baseline reference line.
+- `render_sector_metrics_table(sector_agg, currency_symbol)` — Streamlit DataFrame with columns: Sector, Stocks, Avg ROIC, Avg D/E, Total Market Cap, Passed Filters. Tooltips on column headers.
+- `create_sector_relative_chart(universe_df, results_df_raw)` — Diverging horizontal bar chart. For each filtered stock, computes `stock_ROIC - sector_median_ROIC` (in percentage points). Green bars = outperforms sector, red = underperforms. Hover shows stock sector, actual ROIC, and sector median. Uses sector median (not mean) to resist outlier influence.
+
+**Screening Pipeline Changes** (`src/quant/screener.py`):
+- `screen_stocks()`: Added `sector` and `industry` extraction from `data.get('sector')` / `data.get('industry')` into result dict. Two extra `data.get()` calls, zero API cost. Fields flow through filtering into `results_df_raw`.
+- NEW function `build_sector_universe(stocks_data)`: Builds a DataFrame of ALL stocks (pre-filter) with ticker, company_name, sector, industry, market_cap, current_price, roic, debt_to_equity. Calls `calculate_all_metrics()` per stock (financial statements already in-memory — no API calls, ~50ms for 100 stocks). Drops stocks with no market_cap (can't size treemap).
+
+**Config Addition** (`src/utils/config.py`):
+- `SECTOR_TREEMAP_COLOR_SCALE: Final[list]` — 4-stop color scale: `[0.0, "#EF4444"]` (red), `[0.4, "#F59E0B"]` (amber), `[0.7, "#10B981"]` (emerald), `[1.0, "#34D399"]` (light emerald). Matches existing scatter plot color scale pattern.
+
+**App Integration** (`app.py`):
+- 4th tab: `st.tabs([..., "Sector Analysis"])` alongside existing 3 tabs.
+- After `screen_stocks()`, calls `build_sector_universe(stocks_data)` and stores in `st.session_state.universe_df`.
+- New session state key `universe_df` initialized in `initialize_session_state()`.
+- `render_sector_section()` receives `universe_df`, `results_df_raw`, and `screening_config`.
+
+**UI Updates**:
+- `sidebar.py`: New "Sector Analysis" entry in Quant Mentor glossary explaining treemap and sector-relative view. Version bumped to 1.5.0.
+- `components.py`: Footer version bumped to 1.5.0.
+
+**Design Decisions**:
+- **Full universe for sector analysis, not just filtered stocks**: With only 5-20 filtered stocks, sectors would be sparse (1-2 stocks per sector). Using all ~100 screened tickers gives meaningful sector aggregates (8-12 sectors with 5-15 stocks each). Filtered stocks are highlighted within the full context via the `filtered_count` column and sector-relative chart.
+- **Sector from yfinance, not custom mapping**: yfinance provides GICS sector/industry classification directly via `.info['sector']`. More accurate than maintaining our own mapping, zero maintenance cost. Falls back to "Unknown" for stocks missing sector data (rare for large-caps).
+- **`build_sector_universe()` recomputes metrics**: Calls `calculate_all_metrics()` per stock, but financial statements are already in `stocks_data` (in-memory). The computation is ~50ms for 100 stocks — negligible. Avoids changing `screen_stocks()` return signature or adding complexity to the screening pipeline.
+- **Treemap over pie chart**: Treemap shows both relative size (market cap) and quality (ROIC via color) simultaneously in a single visualization. Pie charts only show one dimension (size). Treemaps are the standard in financial analysis tools (Bloomberg, Finviz, S&P Capital IQ).
+- **Sector-relative uses median, not mean**: Median is robust to outliers. One 80% ROIC outlier in a sector wouldn't skew the reference point. The sector-relative view becomes a true "how does this stock compare to a typical company in its sector" measure.
+- **"Unknown" sector excluded when real sectors exist**: If 95 of 100 stocks have sectors and 5 don't, the "Unknown" group would pollute the treemap and aggregates. Excluded from aggregation. If ALL stocks are "Unknown" (shouldn't happen), the full DataFrame is used.
+- **Diverging bar chart in percentage points (pp)**: ROIC difference is expressed as percentage points (e.g., "+5.2pp" means stock ROIC is 5.2 percentage points above sector median). This is the standard financial convention for comparing rates.
+
+**Verification**: 8 test assertions passed — sector aggregation (3 sectors from 5 stocks, correct avg ROIC 27.5% for Technology, correct filtered counts), treemap/comparison/relative chart generation (non-None for valid data), edge cases (None for empty DataFrames), build_sector_universe (2 rows from 3 entries with 1 None, correct columns).
+
+### 2026-02-13 (Session 23) - Momentum Signals (v1.4.0)
+**Enhancement** (`src/quant/metrics.py`, `src/quant/screener.py`, `src/ui/deep_dive.py`, `src/ui/sidebar.py`, `src/ui/components.py`, `src/utils/config.py`, `app.py`):
+- **Problem**: The screener evaluated stocks purely on fundamental quality (ROIC, FCF, D/E) and price discount (52-week low proximity). No technical momentum signal existed. A stock could have excellent fundamentals and a deep discount but be in a persistent downtrend with no sign of reversal — a "value trap." Users had no way to identify whether price momentum was turning in their favor before committing.
+- **Fix**: Added per-stock Momentum Score (0-100) composing three technical indicators, displayed in the results table, as SMA overlays on the existing price chart, as a dedicated RSI/MACD chart in Deep Dive, and as an optional hybrid ranking blend (70% value + 30% momentum).
+
+**New Functions** (`src/quant/metrics.py`):
+- `calculate_rsi(price_df, period=14)` — Wilder RSI using exponential moving average smoothing. Returns current RSI value 0-100. Requires `period + 1` data points minimum.
+- `calculate_macd(price_df, fast=12, slow=26, signal=9)` — Returns dict with `macd_line`, `signal_line`, `histogram` (current scalar values). Requires `slow + signal` data points minimum.
+- `calculate_sma_crossover(price_df, short=50, long=200)` — Returns dict with `sma_short`, `sma_long`, `price`, `golden_cross` (bool), `price_above_short`, `price_above_long`.
+- `_score_rsi(rsi)` — Value-investor tuned: ≤20→20, 20-40→linear 20-100, 40-55→100 (sweet spot), 55-80→linear 100-0, ≥80→0. Peak rewards recovering-from-oversold zone, penalizes overbought.
+- `_score_macd(histogram, price)` — Normalizes histogram to price, maps [-2%, +2%] linearly to [0, 100]. Bullish (positive histogram) scores above 50.
+- `_score_sma(price, sma_short, sma_long)` — Additive: +30 price>SMA50, +30 price>SMA200, +40 SMA50>SMA200 (golden cross).
+- `calculate_momentum_score(price_df)` — Orchestrator computing all three indicators, scoring each, producing weighted average composite 0-100. Uses weighted-average-of-available pattern (same as earnings quality) — missing indicators don't penalize, just reduce weight pool.
+- `calculate_momentum_indicators(price_df)` — Full time-series DataFrame for chart overlays: RSI, MACD, MACD_Signal, MACD_Histogram, SMA_50, SMA_200 columns.
+
+**Config Additions** (`src/utils/config.py`):
+- `RSI_PERIOD: int = 14`, `MACD_FAST: int = 12`, `MACD_SLOW: int = 26`, `MACD_SIGNAL: int = 9`
+- `SMA_SHORT_PERIOD: int = 50`, `SMA_LONG_PERIOD: int = 200`
+- `MOMENTUM_WEIGHTS: Dict[str, float]` — `rsi: 0.35, macd: 0.35, sma: 0.30`
+- `HYBRID_VALUE_WEIGHT: float = 0.70`, `HYBRID_MOMENTUM_WEIGHT: float = 0.30`
+
+**Screening Integration** (`src/quant/screener.py`):
+- `compute_momentum_scores(df, stocks_data)`: For each ticker in filtered DataFrame, fetches 2y historical prices (cached), computes `calculate_momentum_score()`, adds `momentum_score` column.
+- `compute_hybrid_scores(df)`: Computes `hybrid_score = value_score * 0.7 + momentum_rank_pctile * 0.3`. Momentum is rank-percentile normalized within the filtered universe for consistency with value_score.
+- `screen_stocks()`: New `use_hybrid_ranking` param (default False). Momentum always computed for filtered stocks. When hybrid enabled, ranking uses `hybrid_score`; otherwise `value_score`.
+- `rank_by_value_score()`: New `score_column` param (default `'value_score'`), supports ranking by `'hybrid_score'`.
+- `format_results_for_display()`: Adds `momentum_score_fmt` column.
+
+**UI Integration**:
+- `sidebar.py`: New "Hybrid Ranking (Value + Momentum)" checkbox in Momentum section. Filter chip when enabled. Four new glossary entries (RSI, MACD, Golden Cross, Momentum Score).
+- `components.py`: New "Momentum" column in results table with tooltip.
+- `deep_dive.py`: Refactored `create_price_bollinger_chart()` to accept optional `price_df_2y` parameter, adds SMA 50 (amber dot) and SMA 200 (purple dot) overlay traces. New `create_momentum_chart()` — 2-row Plotly subplot with RSI (row 1, with 30/70 reference lines) and MACD (row 2, line + signal + histogram bars). New `render_momentum_section()` — chart + 3 metric cards (Momentum Score with bullish/bearish label, RSI with zone label, SMA crossover status). `render_deep_dive_section()` fetches 2y data once, reuses for both Bollinger and momentum.
+- `app.py`: Threads `use_hybrid_ranking` through to `screen_stocks()`.
+
+**Design Decisions**:
+- **Compute momentum only for filtered stocks**: After all value filters, typically 5-20 stocks survive. Fetching 2y historical prices for these is ~5-20 cached API calls. Avoids 100+ fetches during screening.
+- **RSI scoring tuned for value investors**: Standard momentum scoring rewards RSI 50-70 (strong uptrend). For a value screener, the sweet spot is RSI 30-55 — stocks recovering from oversold conditions with emerging momentum, not already overbought. This aligns with the "buy the dip" philosophy.
+- **MACD normalized to price**: Raw MACD histogram is in price units (meaningless across stocks at different price levels). Normalizing as % of price makes the signal comparable. The ±2% mapping comes from typical large-cap MACD histogram range.
+- **SMA scoring is additive, not multiplicative**: Three independent signals (price>SMA50, price>SMA200, golden cross) contribute additively. This means a stock with golden cross but price slightly below SMA50 still gets 70/100, not 0 from multiplication.
+- **Hybrid ranking uses rank-percentile for momentum**: Consistent with value_score's rank-percentile approach. Avoids scale mismatch (value_score is 0-1, momentum_score is 0-100). Both components get normalized to 0-1 via rank percentile.
+- **2y data fetch, 1y display**: SMA200 needs ~200 trading days (~10 months). With only 1y of data, SMA200 values are NaN for the first ~8 months. Fetching 2y and displaying last 1y ensures valid SMA200 values across the full displayed range.
+- **Hybrid ranking off by default**: Non-breaking change. Pure value ranking preserved. Users opt in to momentum blending via sidebar checkbox.
+- **Momentum always computed, even when hybrid is off**: The momentum_score column always appears in the results table for informational purposes. The checkbox only controls whether it affects ranking order.
+
+**Verification**: 6 test groups passed — RSI scoring boundaries (9 assertions, all exact), MACD scoring (4 assertions), SMA scoring (4 assertions), full pipeline with 500-row synthetic data (composite score 52.5), indicator time-series shape (500×6), edge cases (empty DF → None, 3-row DF → None).
+
+### 2026-02-13 (Session 22) - Earnings Quality Score (v1.3.0)
+**Enhancement** (`src/quant/metrics.py`, `src/quant/screener.py`, `src/ui/deep_dive.py`, `src/ui/sidebar.py`, `src/ui/components.py`, `src/utils/config.py`, `app.py`):
+- **Problem**: No way to assess whether a company's reported earnings are backed by actual cash flow. A company could show strong ROIC and pass all filters while having aggressive accounting — accruing revenue not yet collected, or reporting income that far exceeds operating cash flow. Users had no signal to distinguish high-quality earnings from potentially manipulated ones.
+- **Fix**: Added a per-stock Earnings Quality Score (0-100) composing three sub-metrics, displayed in the results table, as an optional sidebar filter, and as a gauge chart with component breakdown in Deep Dive.
+
+**New Functions** (`src/quant/metrics.py`):
+- `calculate_earnings_quality(data)` — orchestrator that computes all three sub-metrics, scores each 0-100 via linear interpolation, and produces weighted composite. Uses weighted average of available components (graceful None handling for missing data).
+- `_compute_accrual_ratio(income, cashflow, balance)` — (Net Income - Operating Cash Flow) / Total Assets. Lower = better. Negative means cash exceeds reported income.
+- `_compute_fcf_to_ni_ratio(income, cashflow)` — Free Cash Flow / Net Income. >1.0 = cash exceeds profit (gold standard). Only meaningful for profitable companies (NI > 0).
+- `_compute_rev_rec_divergence(income, balance)` — Revenue growth minus Receivables growth (YoY). Positive = healthy (revenue growing faster). Needs 2+ years of data.
+- `_score_accrual_ratio(ratio)` — Linear: -0.10 → 100, +0.20 → 0
+- `_score_fcf_to_ni(ratio)` — Linear: 1.50 → 100, 0.00 → 0
+- `_score_rev_rec_divergence(div)` — Linear: +10% → 100, -10% → 0
+
+**Config Addition** (`src/utils/config.py`):
+- `EARNINGS_QUALITY_WEIGHTS: Dict[str, float]` — `accrual_ratio: 0.40, fcf_to_ni: 0.35, rev_rec_divergence: 0.25`
+
+**Screening Integration** (`src/quant/screener.py`):
+- `screen_stocks()`: New `min_earnings_quality` param (default 0 = disabled), applied between quality filters and valuation filter
+- `apply_earnings_quality_filter(df, min_score)`: Stocks with None score always pass (not penalized for missing data)
+- `format_results_for_display()`: Adds `earnings_quality_fmt` column (integer string)
+
+**UI Integration**:
+- `sidebar.py`: New slider "Min Earnings Quality Score" (0-100, default 0, step 5). Filter chip shown when enabled. Glossary entry added.
+- `components.py`: New "EQ Score" column in results table with tooltip explaining the 0-100 scale
+- `deep_dive.py`: New section "Earnings Quality Assessment" with Plotly gauge chart (go.Indicator, red/amber/green zones) and 3 metric cards showing raw sub-metric values with contextual labels
+
+**Design Decisions**:
+- **Weighted average of available components**: Follows forecast composite pattern. A stock missing receivables data still gets a score from accrual + FCF/NI. Only returns None if zero components can be computed.
+- **Default filter at 0 (disabled)**: Non-breaking change. Existing screening behavior unchanged. Users opt-in by raising the threshold.
+- **Per-stock in metrics.py, not screener**: Unlike value score (which is universe-relative), earnings quality is absolute per-stock data. Computed in `calculate_all_metrics()`.
+- **No config for scoring bounds**: The thresholds (-0.10 to 0.20 for accruals, etc.) are based on established academic ranges (Sloan 1996 accrual anomaly). Not user-tunable.
+- **NI > 0 guard on FCF/NI ratio**: Ratio is meaningless for loss-making companies. Returns None rather than a misleading negative ratio.
+- **Receivable_y1 > 0 guard on rev/rec divergence**: Prevents division by zero for companies with zero base-year receivables.
+- **Component weights (40/35/25)**: Accrual ratio gets the highest weight as the most academically validated earnings quality signal. FCF/NI is a direct cash check. Rev/rec divergence is supplementary.
+
+**Verification**: 7 test cases passed — scoring helpers (boundary and midpoint), full synthetic data (score 64.1), empty data (None), partial data with missing cashflow (still produces score from available components).
+
+### 2026-02-13 (Session 21) - Confidence Level Badges (v1.2.3)
+**Enhancement** (`src/quant/metrics.py`, `src/ui/components.py`, `src/ui/styles.py`):
+- **Problem**: Users had no visibility into data completeness per stock. A stock with full 3-year financials and beta data appeared identical to one missing statements or years. No way to assess how trustworthy each stock's metrics are.
+- **Fix**: Added per-stock data confidence indicator ("High"/"Medium"/"Low") displayed in both the results table and Top 5 cards.
+
+**New Function** (`src/quant/metrics.py`):
+- `calculate_data_confidence(data)` — checks presence/completeness of income statement, balance sheet, cashflow statement (each needing 3+ years), and beta availability
+  - High: All 3 statements with 3+ years + beta present
+  - Medium: All 3 statements present but missing beta or any statement has < 3 years
+  - Low: Any financial statement missing entirely
+
+**Integration Points**:
+- `calculate_all_metrics()` in `metrics.py`: Calls `calculate_data_confidence(data)`, adds `'confidence'` key to return dict
+- `render_results_table()` in `components.py`: New `'confidence'` column with tooltip explaining the three levels
+- `render_top_5_cards()` in `components.py`: Passes confidence to `top_pick_card()`
+- `top_pick_card()` in `styles.py`: New optional `confidence` parameter renders colored text under ticker (green=High, amber=Medium, red=Low)
+
+**Design Decisions**:
+- **Informational only, no filtering**: Confidence is metadata — doesn't exclude stocks from results. Users can see it and make their own judgment. Different from Data Quality Report (which logs fetch/validation issues).
+- **Three discrete tiers, not continuous**: "High"/"Medium"/"Low" is more actionable than a numeric score. Users understand "Medium" better than "0.67".
+- **No emojis**: Consistent with v1.1.0 design decision. Text labels with color coding via existing COLORS palette.
+- **No config constants**: The criteria (3 statements, 3 years, beta) are structural data completeness checks, not tunable thresholds.
+- **Statement column count for years**: Uses `DataFrame.shape[1]` to count fiscal years. yfinance typically returns 4 columns for annual statements — checking >= 3 is the sweet spot between "has meaningful history" and "allowing for occasional missing years."
+
+**Verification**: 6 synthetic test cases passed — High (full data), Medium (no beta), Medium (< 3 years), Low (missing statement), Low (empty statement), Low (no data).
+
+### 2026-02-13 (Session 20) - Metric Sanity Bounds Validation (v1.2.2)
+**Enhancement** (`src/utils/config.py`, `src/quant/metrics.py`, `src/quant/forecast.py`):
+- **Problem**: Computed metrics can produce absurd values from corrupted yfinance data, near-zero denominators, or edge-case financials (D/E = 850x, P/E = 3000x). These values flow through the pipeline silently — only ROIC cap (100%) catches one specific case. No systematic validation or user visibility.
+- **Fix**: Added bounds validation that flags out-of-range values as `"validation_error"` entries in the Data Quality Report. Values themselves are preserved (flag-only, no clamping).
+
+**Config Addition** (`src/utils/config.py`):
+- `METRIC_SANITY_BOUNDS: Dict[str, Tuple[float, float]]` — bounds for 4 metrics:
+  - `roic`: (-0.50, 1.00) — -50% to 100%
+  - `debt_to_equity`: (0.0, 50.0) — 0x to 50x
+  - `trailing_pe`: (0.0, 200.0) — 0x to 200x
+  - `fcf_cagr`: (-0.50, 2.00) — -50% to 200%
+- Added `Tuple` to typing imports
+
+**New Function** (`src/quant/metrics.py`):
+- `validate_metric_bounds(ticker, metric_name, value)` — looks up bounds from config, calls `log_data_issue()` with `"validation_error"` if value is outside range. None values silently skipped.
+
+**Integration Points**:
+- `calculate_all_metrics()` in `metrics.py`: Validates ROIC, D/E, and trailing P/E (from raw yfinance `.info` dict) per stock
+- `calculate_composite_forecast()` in `forecast.py`: Validates FCF CAGR from base DCF result
+
+**Design Decisions**:
+- **Flag-only, no clamping**: Values are preserved in the pipeline. Clamping would silently mutate data and hide issues. Existing mechanisms (ROIC cap, D/E 999.0 sentinel, screening filters) already exclude truly broken stocks. Bounds validation adds visibility, not behavior changes.
+- **Reuse existing logger**: Logged as `"validation_error"` — appears automatically in the Data Quality Report expander. No UI changes needed.
+- **P/E from raw data, not computed**: `trailingPE` is read directly from yfinance `.info` dict in `calculate_all_metrics()`. Not a computed metric, but worth flagging since extreme P/E values affect the Earnings Multiple forecast model.
+- **FCF CAGR validated in forecast.py**: Computed inside `calculate_dcf_valuation()`, extracted from base-case result in `calculate_composite_forecast()`. Keeps validation close to where the metric is consumed.
+- **Ticker extraction**: `calculate_all_metrics()` reads ticker from `data.get('symbol', data.get('ticker', 'UNKNOWN'))` — yfinance uses 'symbol' key, but fallback handles edge cases.
+
+### 2026-02-13 (Session 20) - Market-Specific Terminal Growth & ERP (v1.2.1)
+**Enhancement** (`src/utils/config.py`, `src/quant/forecast.py`, `src/ui/forecast_tab.py`):
+- **Problem**: Flat 3% terminal growth and 5.5% ERP globally is economically incorrect. Indian companies in a 6-7% nominal GDP economy deserve higher terminal growth than UK companies in a 2-3% GDP economy. Using flat values systematically undervalues Indian companies and overvalues UK companies in DCF models.
+- **Fix**: Replaced two global scalars with market-specific dicts matching the existing `RISK_FREE_RATES` pattern.
+
+**Config Changes** (`src/utils/config.py`):
+- `TERMINAL_GROWTH_RATE: float = 0.03` → `TERMINAL_GROWTH_RATES: Dict[str, float]` = {India: 5%, US: 3%, UK: 2.5%}
+- `EQUITY_RISK_PREMIUM: float = 0.055` → `EQUITY_RISK_PREMIUMS: Dict[str, float]` = {India: 7.5%, US: 5.0%, UK: 5.5%}
+- New helpers: `get_terminal_growth_rate(index)`, `get_equity_risk_premium(index)` with US defaults for unknown indices
+
+**Forecast Engine Changes** (`src/quant/forecast.py`):
+- `calculate_composite_forecast()`: Looks up market-specific `terminal_growth` and `erp` from index, passes to all 3 model functions
+- `calculate_earnings_multiple_valuation()`: New `terminal_growth` param replaces hardcoded `TERMINAL_GROWTH_RATE` in `_apply_scenario_growth()` call
+- `calculate_roic_growth_valuation()`: New `terminal_growth` param replaces hardcoded `TERMINAL_GROWTH_RATE` in `_apply_scenario_growth()` call
+- All function default parameter values use US-equivalent plain floats (0.03, 0.05) for backward compatibility
+
+**UI Changes** (`src/ui/forecast_tab.py`):
+- Assumptions table: ERP and terminal growth now show market-specific values
+- DCF model card: Terminal growth displays market-specific value
+- Scenario caption: "growth decays toward GDP (X%)" dynamically reflects market
+- `render_model_breakdown()`: New `index` parameter to support market-specific display
+
+**Impact on Forecasts**:
+- **India (NIFTY100)**: Terminal growth 3%→5% (higher DCF values). ERP 5.5%→7.5% (higher WACC, lower DCF values). Net: more accurate, mixed direction.
+- **US (SP500)**: ERP 5.5%→5.0% (slightly lower WACC, slightly higher DCF values). Terminal growth unchanged.
+- **UK (FTSE100)**: Terminal growth 3%→2.5% (slightly lower DCF values). ERP unchanged at 5.5%.
+
+**Design Decisions**:
+- **Dict pattern over per-function lookup**: Matches existing `RISK_FREE_RATES` and `MARKET_ANNUAL_RETURNS` patterns in config.py. Consistent, predictable, easy to extend for new markets.
+- **Helper functions with defaults**: `get_terminal_growth_rate()` and `get_equity_risk_premium()` default to US values for unknown indices — safe fallback, avoids KeyError.
+- **Plain float defaults on function signatures**: Changed from `TERMINAL_GROWTH_RATE` import to `0.03` literal. Functions remain callable standalone without config dependency. Only `calculate_composite_forecast()` (the orchestrator) does the market-specific lookup.
+- **India ERP 7.5%**: Damodaran's 2024 estimate for India total ERP is ~7.7%. 7.5% is conservative but significantly more accurate than the previous 5.5% global flat rate.
+- **India terminal growth 5%**: Conservative vs India's 6-7% nominal GDP. Accounts for long-term convergence — even India's growth will slow over 5+ year DCF horizons.
+- **UK terminal growth 2.5%**: Slightly below the 3% US rate, reflecting UK's structurally lower GDP growth trajectory post-Brexit.
+
+### 2026-02-12 (Session 19) - Fix Value Score Normalization (v1.2.0)
+**Bug Fix** (`src/quant/screener.py`, `src/quant/metrics.py`):
+- **Symptom**: Value Score rankings almost entirely determined by ROIC. The "40% discount weight" had ~10% actual influence. A stock with 50% ROIC and 5% discount (score 2.04) dominated a stock with 15% ROIC and 60% discount (score 0.84) — a 2.4x gap despite intended 60/40 balance.
+- **Root Cause**: `calculate_value_score()` used incompatible scales: ROIC component `ROIC/0.15` ranged ~0.5–4+, discount component `|dist|/100` ranged 0–0.4. The two components were on entirely different scales, making weights meaningless.
+- **Fix**: Replaced per-stock absolute normalization with universe-relative rank-percentile normalization:
+  1. After all filters applied, compute `df['roic'].rank(pct=True)` → 0 to 1 (highest ROIC = 1.0)
+  2. Compute `df['distance_from_high'].abs().rank(pct=True)` → 0 to 1 (biggest drop = 1.0)
+  3. `value_score = roic_pctile * 0.6 + discount_pctile * 0.4` → true 60/40 weighting
+- **Architectural change**: Value score computation moved from per-stock (`metrics.py:calculate_all_metrics()`) to post-filtering universe-relative (`screener.py:compute_rank_percentile_scores()`). Per-stock computation can't do relative normalization.
+
+**New Function** (`src/quant/screener.py`):
+- `compute_rank_percentile_scores(df, roic_weight, discount_weight)` → DataFrame with value_score 0-1
+
+**Config Additions** (`src/utils/config.py`):
+- `VALUE_SCORE_ROIC_WEIGHT: Final[float] = 0.6`
+- `VALUE_SCORE_DISCOUNT_WEIGHT: Final[float] = 0.4`
+
+**UI Adjustment** (`src/ui/visualizations.py`):
+- Bubble size multiplier: `* 20` → `* 40` (old scores 0.5–4+ gave 10–80px, new scores 0–1 give 0–40px)
+
+**Design Decisions**:
+- **Rank-percentile over min-max**: Min-max is sensitive to outliers (one 80% ROIC compresses everyone else to near-0). Rank-percentile treats the 50th-percentile stock the same regardless of whether the best is 25% or 80% ROIC. More robust for small filtered universes (often 5–20 stocks).
+- **Kept calculate_value_score()**: The old per-stock function is preserved for potential standalone/API use. Just no longer called in the screening pipeline.
+- **Price/FCF signal deferred**: Task mentioned considering Price/FCF as cleaner value signal. Deferred — the normalization fix is the critical bug. With rank-percentile in place, adding a third signal is a clean incremental change.
+- **Score range 0-1**: More intuitive than the old ~0.5–4+ range. 0.850 clearly means "top 85th percentile composite."
+
+**Verification**: 6 synthetic test cases passed — balanced stock ranks highest, ROIC no longer overwhelms discount (ratio 1.19x vs old 2.43x), empty/single-stock edge cases handled.
+
+### 2026-02-12 (Session 19) - Fix ROIC Negative Invested Capital (v1.1.1)
+**Bug Fix** (`src/quant/metrics.py`):
+- **Symptom**: Cash-rich companies (Apple, Google, TCS, Infosys) returned ROIC=None and were silently excluded from screening. Companies with near-zero invested capital produced absurd ROIC values (500%+) dominating top-5 picks.
+- **Root Cause**: `Invested Capital = Total Debt + Total Equity - Cash` goes negative when Cash > Debt + Equity. The code returned None for IC <= 0, excluding profitable companies entirely. Near-zero positive IC produced division-by-tiny-number artifacts.
+- **Fix (two parts)**:
+  1. Fallback capital employed: When primary IC <= 0, compute `Total Assets - Current Liabilities`. Only return None if both methods produce IC <= 0.
+  2. ROIC cap: `min(roic, ROIC_CAP)` where `ROIC_CAP = 1.0` (100%). No sustainable business exceeds this; prevents near-zero denominator artifacts.
+- **New balance sheet keys parsed**: `'Total Assets'`, `'Current Liabilities'`, `'Total Current Liabilities'`
+
+**Config Addition** (`src/utils/config.py`):
+- `ROIC_CAP: Final[float] = 1.0` — added in SCREENING THRESHOLDS section
+
+**Design Decisions**:
+- **Total Assets - Current Liabilities**: Standard "Capital Employed" definition used by Bloomberg and Morningstar. Less precise than primary formula (doesn't isolate operating vs financial assets) but far better than returning None for profitable companies.
+- **100% cap, not lower**: Some asset-light businesses (consulting, software) legitimately earn 50-80% ROIC. A 100% cap only catches mathematical artifacts, not real outliers. Task 4 (Metric Sanity Bounds) will add more granular validation.
+- **No separate flag for fallback**: Considered adding `roic_method: "primary" | "fallback"` field but decided against added complexity. The cap is the primary safety valve, and both methods produce meaningful ROIC values.
+
+**Verification**: 4 synthetic test cases passed — cash-rich fallback (ROIC=0.27), normal company (0.48), cap enforcement (1.0), double-negative returns None.
 
 ### 2026-02-11 (Session 18) - UI/UX Modernization (v1.1.0)
 **New Files Created**:
@@ -1042,6 +1482,7 @@ User Input (Tickers)
 - **metrics.py**: NOPAT-based ROIC, 3-year FCF validation, D/E ratio, value score calculation
 - **screener.py**: Strict filtering pipeline, ranking algorithm, display formatting
 - **forecast.py**: Multi-model forecasting (DCF, Earnings Multiple, ROIC Growth), scenario analysis, risk metrics, composite forecasts
+- **metrics.py**: Momentum indicators (RSI, MACD, SMA crossover) with composite momentum score
 
 #### `src/ui/` (✅ IMPLEMENTED)
 - **styles.py**: Midnight Finance design system (color palette, global CSS, Plotly dark theme, HTML card helpers)
@@ -1050,6 +1491,7 @@ User Input (Tickers)
 - **visualizations.py**: Plotly scatter plot with custom color scale (ROIC vs Price Discount)
 - **deep_dive.py**: Per-stock analysis (Bollinger Bands, ROIC/FCF trends, P/E Mean Reversion, due diligence links)
 - **forecast_tab.py**: Forecast & Valuation tab (summary table, price target charts, model breakdown, risk dashboard, assumptions)
+- **sector_tab.py**: Sector Analysis tab (treemap by market cap/ROIC, sector comparison bars, summary table, sector-relative ROIC view)
 
 ---
 
@@ -1213,7 +1655,7 @@ User Input (Tickers)
 ---
 
 ## Future Enhancements (Backlog)
-- [ ] Add sector-based peer comparison
+- [x] ~~Add sector-based peer comparison~~ (v1.5.0 — Sector Analysis Tab)
 - [x] ~~Implement DCF (Discounted Cash Flow) valuation model~~ (v1.0.0)
 - [x] ~~Export results to CSV/Excel~~ (forecast CSV export in v1.0.0)
 - [ ] Add historical performance backtesting
@@ -1222,5 +1664,5 @@ User Input (Tickers)
 
 ---
 
-**Last Updated**: 2026-02-11 (Session 18 - UI/UX Modernization - v1.1.0)
+**Last Updated**: 2026-02-13 (Session 25 - Peer Comparison Panel - v1.6.0)
 **Maintained By**: Claude (Senior Quant Developer)

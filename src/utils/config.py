@@ -3,7 +3,7 @@ Application-wide configuration constants.
 Defines cache durations, API settings, and screening thresholds.
 """
 
-from typing import Final, Dict
+from typing import Final, Dict, Tuple
 
 # ==================== CACHE CONFIGURATION ====================
 # Cache TTL (Time To Live) in seconds
@@ -68,9 +68,29 @@ def get_currency_symbol(index: str) -> str:
 # Default values for quality filters
 
 MIN_ROIC: Final[float] = 0.12           # 12% minimum ROIC
+ROIC_CAP: Final[float] = 1.0            # 100% cap — no sustainable business exceeds this
 MIN_FCF_YIELD: Final[float] = 0.05      # 5% minimum FCF yield
 MAX_DEBT_EQUITY: Final[float] = 1.0     # Maximum D/E ratio
 MIN_MARKET_CAP: Final[int] = 1_000_000_000  # $1B or ₹1000 Cr
+
+# Value Score component weights (must sum to 1.0)
+VALUE_SCORE_ROIC_WEIGHT: Final[float] = 0.6    # 60% quality (ROIC rank-percentile)
+VALUE_SCORE_DISCOUNT_WEIGHT: Final[float] = 0.4 # 40% price discount rank-percentile
+
+# Earnings Quality Score component weights (must sum to 1.0)
+EARNINGS_QUALITY_WEIGHTS: Final[Dict[str, float]] = {
+    "accrual_ratio": 0.40,       # Most established academic signal (Sloan 1996)
+    "fcf_to_ni": 0.35,           # Direct cash conversion check
+    "rev_rec_divergence": 0.25,  # Supplementary red flag detector
+}
+
+# Metric sanity bounds: (min, max) — values outside flagged as suspect in Data Quality Report
+METRIC_SANITY_BOUNDS: Final[Dict[str, Tuple[float, float]]] = {
+    "roic":           (-0.50, 1.00),    # -50% to 100% (ROIC_CAP already enforces upper)
+    "debt_to_equity": (0.0,   50.0),    # 0x to 50x
+    "trailing_pe":    (0.0,   200.0),   # 0x to 200x (loss-making = negative = suspect)
+    "fcf_cagr":       (-0.50, 2.00),    # -50% to 200%
+}
 
 # ==================== UI CONFIGURATION ====================
 
@@ -91,8 +111,12 @@ RISK_FREE_RATES: Final[Dict[str, float]] = {
     "FTSE100": 0.045,     # UK 10Y Gilt ~4.5%
 }
 
-# Equity risk premium (global average)
-EQUITY_RISK_PREMIUM: Final[float] = 0.055  # 5.5%
+# Equity risk premiums by market
+EQUITY_RISK_PREMIUMS: Final[Dict[str, float]] = {
+    "NIFTY100": 0.075,    # India: higher country risk, emerging market premium
+    "SP500": 0.050,        # US: Damodaran estimate ~5.0%
+    "FTSE100": 0.055,      # UK: developed market, slightly above US (Brexit risk)
+}
 
 # Long-term average annual market returns (nominal)
 MARKET_ANNUAL_RETURNS: Final[Dict[str, float]] = {
@@ -101,8 +125,58 @@ MARKET_ANNUAL_RETURNS: Final[Dict[str, float]] = {
     "FTSE100": 0.08,      # FTSE long-term ~8%
 }
 
-# Terminal growth rate (long-term GDP proxy)
-TERMINAL_GROWTH_RATE: Final[float] = 0.03  # 3%
+# Terminal growth rates by market (long-term nominal GDP proxy)
+TERMINAL_GROWTH_RATES: Final[Dict[str, float]] = {
+    "NIFTY100": 0.05,     # India nominal GDP ~6-7%, conservative 5%
+    "SP500": 0.03,         # US nominal GDP ~3-4%, standard 3%
+    "FTSE100": 0.025,      # UK nominal GDP ~2-3%, conservative 2.5%
+}
+
+
+def get_terminal_growth_rate(index: str) -> float:
+    """Return terminal growth rate for a given market index."""
+    return TERMINAL_GROWTH_RATES.get(index, 0.03)
+
+
+def get_equity_risk_premium(index: str) -> float:
+    """Return equity risk premium for a given market index."""
+    return EQUITY_RISK_PREMIUMS.get(index, 0.05)
+
+# ==================== MOMENTUM CONFIGURATION ====================
+
+# RSI (Relative Strength Index)
+RSI_PERIOD: Final[int] = 14  # Standard Wilder RSI lookback
+
+# MACD (Moving Average Convergence Divergence)
+MACD_FAST: Final[int] = 12    # Fast EMA period
+MACD_SLOW: Final[int] = 26    # Slow EMA period
+MACD_SIGNAL: Final[int] = 9   # Signal line EMA period
+
+# Simple Moving Averages
+SMA_SHORT_PERIOD: Final[int] = 50   # Short-term trend
+SMA_LONG_PERIOD: Final[int] = 200   # Long-term trend
+
+# Momentum score component weights (must sum to 1.0)
+MOMENTUM_WEIGHTS: Final[Dict[str, float]] = {
+    "rsi": 0.35,    # Overbought/oversold signal
+    "macd": 0.35,   # Trend strength and direction
+    "sma": 0.30,    # Trend confirmation (golden/death cross)
+}
+
+# Hybrid score blend: Value × 0.7 + Momentum × 0.3
+HYBRID_VALUE_WEIGHT: Final[float] = 0.70
+HYBRID_MOMENTUM_WEIGHT: Final[float] = 0.30
+
+# Peer comparison panel
+PEER_COMPARISON_COUNT: Final[int] = 7  # Number of sector/industry peers to show in Deep Dive
+
+# Sector treemap color scale (ROIC-based: red → amber → green)
+SECTOR_TREEMAP_COLOR_SCALE: Final[list] = [
+    [0.0, "#EF4444"],   # Red (low ROIC)
+    [0.4, "#F59E0B"],   # Amber (mid ROIC)
+    [0.7, "#10B981"],   # Emerald (good ROIC)
+    [1.0, "#34D399"],   # Light emerald (high ROIC)
+]
 
 # Maximum allowed growth rate for projections (sanity cap)
 MAX_PROJECTION_GROWTH: Final[float] = 0.30  # 30%

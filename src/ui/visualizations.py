@@ -59,8 +59,8 @@ def create_value_scatter_plot(df: pd.DataFrame) -> Optional[go.Figure]:
     # Ensure distance_from_low is positive (% above 52w low)
     plot_df['distance_from_low_pct'] = plot_df['distance_from_low']
 
-    # Scale bubble size based on value_score (min 10, max 50)
-    plot_df['bubble_size'] = plot_df['value_score'] * 20
+    # Scale bubble size based on value_score (0-1 range after rank-percentile)
+    plot_df['bubble_size'] = plot_df['value_score'] * 40
 
     # Format market cap for hover
     plot_df['market_cap_fmt'] = plot_df['market_cap'].apply(_format_market_cap)

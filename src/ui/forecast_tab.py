@@ -17,10 +17,10 @@ from src.quant.forecast import (
 )
 from src.utils.config import (
     get_currency_symbol,
+    get_terminal_growth_rate,
+    get_equity_risk_premium,
     RISK_FREE_RATES,
-    EQUITY_RISK_PREMIUM,
     MARKET_ANNUAL_RETURNS,
-    TERMINAL_GROWTH_RATE,
     CHART_COLOR_BULL,
     CHART_COLOR_BASE,
     CHART_COLOR_BEAR,
@@ -164,8 +164,9 @@ def render_forecast_section(
 
     # Price Target Chart (Bull / Base / Bear)
     st.markdown(section_header("5-Year Price Projection"), unsafe_allow_html=True)
+    terminal_pct = get_terminal_growth_rate(index) * 100
     st.caption(
-        "Bull = historical growth maintained | Base = growth decays toward GDP (3%) | "
+        f"Bull = historical growth maintained | Base = growth decays toward GDP ({terminal_pct:.0f}%) | "
         "Bear = 50% of historical growth. Market line = long-term index average return."
     )
     fig = create_price_target_chart(forecast, currency_symbol)
@@ -176,7 +177,7 @@ def render_forecast_section(
 
     # Model Breakdown
     st.markdown(section_header("Model Breakdown"), unsafe_allow_html=True)
-    render_model_breakdown(forecast, currency_symbol)
+    render_model_breakdown(forecast, currency_symbol, index=index)
 
     st.markdown("<div style='height: 24px;'></div>", unsafe_allow_html=True)
 
@@ -471,6 +472,7 @@ def create_price_target_chart(
 def render_model_breakdown(
     forecast: Dict[str, Any],
     currency_symbol: str,
+    index: str = "SP500",
 ) -> None:
     """Show individual model outputs in styled card containers."""
     col1, col2, col3 = st.columns(3)
@@ -480,10 +482,11 @@ def render_model_breakdown(
         dcf_base = forecast.get("dcf", {}).get("base")
         if dcf_base is not None:
             intrinsic = dcf_base['intrinsic_value_per_share']
+            terminal_g = get_terminal_growth_rate(index)
             items = (
                 f"WACC: <strong>{dcf_base['wacc']*100:.1f}%</strong><br>"
                 f"FCF CAGR: <strong>{dcf_base['fcf_cagr']*100:.1f}%</strong><br>"
-                f"Terminal Growth: <strong>{TERMINAL_GROWTH_RATE*100:.0f}%</strong><br>"
+                f"Terminal Growth: <strong>{terminal_g*100:.0f}%</strong><br>"
                 f"Intrinsic Value: <strong>{currency_symbol}{intrinsic:,.2f}</strong><br>"
             )
             for label in ["1 Year", "5 Years"]:
@@ -634,12 +637,14 @@ def render_assumptions_table(
     )
 
     risk_free = RISK_FREE_RATES.get(index, 0.045)
+    erp = get_equity_risk_premium(index)
+    terminal_growth = get_terminal_growth_rate(index)
     market_return = MARKET_ANNUAL_RETURNS.get(index, 0.10)
 
     assumptions: list = [
         ("Risk-Free Rate", f"{risk_free*100:.1f}%"),
-        ("Equity Risk Premium", f"{EQUITY_RISK_PREMIUM*100:.1f}%"),
-        ("Terminal Growth Rate", f"{TERMINAL_GROWTH_RATE*100:.1f}%"),
+        ("Equity Risk Premium", f"{erp*100:.1f}%"),
+        ("Terminal Growth Rate", f"{terminal_growth*100:.1f}%"),
         ("Market Annual Return", f"{market_return*100:.1f}%"),
     ]
 

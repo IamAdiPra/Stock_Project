@@ -199,12 +199,29 @@ def model_card(title: str, items_html: str, accent: str = "blue") -> str:
     """
 
 
-def top_pick_card(rank: int, ticker: str, roic: str, score: str) -> str:
+def top_pick_card(
+    rank: int, ticker: str, roic: str, score: str,
+    confidence: Optional[str] = None,
+) -> str:
     """Card for a single top pick entry."""
     rank_colors = {1: COLORS["accent_green"], 2: COLORS["accent_green"],
                    3: COLORS["accent_blue"], 4: COLORS["accent_blue"],
                    5: COLORS["accent_purple"]}
     ring_color = rank_colors.get(rank, COLORS["accent_blue"])
+
+    # Confidence badge (small colored label under ticker)
+    confidence_html = ""
+    if confidence:
+        conf_colors = {
+            "High": COLORS["accent_green"],
+            "Medium": COLORS["accent_amber"],
+            "Low": COLORS["accent_red"],
+        }
+        conf_color = conf_colors.get(confidence, COLORS["text_muted"])
+        confidence_html = (
+            f'<div style="font-size:0.68rem;color:{conf_color};'
+            f'font-weight:500;margin-top:2px;">{confidence}</div>'
+        )
 
     return f"""
     <div style="
@@ -238,6 +255,7 @@ def top_pick_card(rank: int, ticker: str, roic: str, score: str) -> str:
                 font-size: 0.95rem;
                 color: {COLORS['text_primary']};
             ">{ticker}</div>
+            {confidence_html}
         </div>
         <div style="text-align:right;">
             <div style="font-size:0.78rem;color:{COLORS['text_secondary']};">ROIC</div>

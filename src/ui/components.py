@@ -70,8 +70,9 @@ def render_top_5_cards(results_df_raw: pd.DataFrame) -> None:
         roic_str = f"{roic_val * 100:.1f}%" if pd.notna(roic_val) else "N/A"
         score_val = row.get('value_score', 0)
         score_str = f"{score_val:.3f}" if pd.notna(score_val) else "N/A"
+        confidence = str(row.get('confidence', '')) if pd.notna(row.get('confidence')) else None
 
-        cards_html += top_pick_card(rank, ticker, roic_str, score_str)
+        cards_html += top_pick_card(rank, ticker, roic_str, score_str, confidence=confidence)
 
     st.markdown(cards_html, unsafe_allow_html=True)
 
@@ -110,9 +111,12 @@ def render_results_table(
         'rank',
         'ticker',
         'company_name',
+        'confidence',
         'roic_pct',
         'de_ratio',
         'value_score',
+        'momentum_score_fmt',
+        'earnings_quality_fmt',
         'market_cap_fmt',
         'current_price_fmt',
         'fifty_two_week_high_fmt',
@@ -131,6 +135,13 @@ def render_results_table(
         'rank': st.column_config.NumberColumn('Rank', width='small'),
         'ticker': st.column_config.TextColumn('Ticker', width='small'),
         'company_name': st.column_config.TextColumn('Company', width='medium'),
+        'confidence': st.column_config.TextColumn(
+            'Confidence',
+            width='small',
+            help="Data completeness: High = all 3 statements with 3+ years + beta. "
+                 "Medium = all statements but missing years or beta. "
+                 "Low = missing financial statements."
+        ),
         'roic_pct': st.column_config.TextColumn(
             'ROIC',
             width='small',
@@ -148,6 +159,20 @@ def render_results_table(
             width='small',
             help="Composite score: 60% quality (ROIC) + 40% price discount from peak. "
                  "Higher score = better value opportunity."
+        ),
+        'momentum_score_fmt': st.column_config.TextColumn(
+            'Momentum',
+            width='small',
+            help="Momentum Score (0-100). Combines RSI (35%), MACD (35%), "
+                 "and SMA crossover (30%). Higher = stronger upward momentum. "
+                 "Sweet spot for value investors: 50-80."
+        ),
+        'earnings_quality_fmt': st.column_config.TextColumn(
+            'EQ Score',
+            width='small',
+            help="Earnings Quality Score (0-100). Combines accrual ratio, "
+                 "FCF/Net Income ratio, and revenue vs receivables growth. "
+                 "70+ = High quality, 40-69 = Medium, Below 40 = Low."
         ),
         'market_cap_fmt': st.column_config.TextColumn('Market Cap', width='small'),
         'current_price_fmt': st.column_config.TextColumn(
@@ -381,7 +406,7 @@ def render_footer() -> None:
             Not investment advice. Always conduct your own due diligence.<br>
             Built with Streamlit, Plotly, yfinance &nbsp;&bull;&nbsp;
             Fundamentals: 24h cache &nbsp;&bull;&nbsp; Price: 1h cache &nbsp;&bull;&nbsp;
-            <strong>Stock Value Screener v1.1.0</strong>
+            <strong>Stock Value Screener v1.6.0</strong>
         </div>""",
         unsafe_allow_html=True
     )

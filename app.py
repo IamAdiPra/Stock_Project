@@ -13,13 +13,14 @@ from src.utils.ticker_lists import get_all_tickers, get_ticker_count
 from src.utils.logger import clear_data_quality_log
 
 # Quant Layer
-from src.quant.screener import screen_stocks, format_results_for_display
+from src.quant.screener import screen_stocks, format_results_for_display, build_sector_universe
 
 # UI Layer
 from src.ui.sidebar import render_sidebar, render_sidebar_footer
 from src.ui.visualizations import create_value_scatter_plot
 from src.ui.deep_dive import render_deep_dive_section
 from src.ui.forecast_tab import render_forecast_section
+from src.ui.sector_tab import render_sector_section
 from src.ui.components import (
     render_header,
     render_metric_cards,
@@ -70,6 +71,9 @@ def initialize_session_state() -> None:
 
     if 'stocks_data' not in st.session_state:
         st.session_state.stocks_data = None
+
+    if 'universe_df' not in st.session_state:
+        st.session_state.universe_df = None
 
     if 'forecast_df' not in st.session_state:
         st.session_state.forecast_df = None
@@ -131,6 +135,8 @@ def run_screening(config: Dict[str, Any]) -> None:
     min_roic = config['min_roic']
     max_de = config['max_de']
     near_low_pct = config['near_low_pct']
+    min_earnings_quality = config.get('min_earnings_quality', 0)
+    use_hybrid_ranking = config.get('use_hybrid_ranking', False)
 
     # Get ticker list (limited to top N by market cap)
     tickers = get_all_tickers(index, limit=ticker_limit)
@@ -172,7 +178,9 @@ def run_screening(config: Dict[str, Any]) -> None:
             min_roic=min_roic,
             max_debt_equity=max_de,
             near_low_threshold=near_low_pct,
-            require_3y_fcf=True
+            require_3y_fcf=True,
+            min_earnings_quality=min_earnings_quality,
+            use_hybrid_ranking=use_hybrid_ranking,
         )
 
         progress_bar.progress(75)
@@ -196,6 +204,9 @@ def run_screening(config: Dict[str, Any]) -> None:
         st.session_state.screening_config = config
         st.session_state.total_screened = total_tickers
         st.session_state.passed_filters = len(results_df)
+
+        # Build sector universe (all stocks, pre-filter) for Sector Analysis tab
+        st.session_state.universe_df = build_sector_universe(stocks_data)
 
         # Invalidate forecast cache (new screening = new data)
         st.session_state.forecast_df = None
@@ -282,9 +293,9 @@ def main() -> None:
 
         # Main Results Display
         if not results_df_raw.empty:
-            # Tabbed layout: Screening Results | Deep Dive Analysis | Forecast & Valuation
-            tab_results, tab_deep_dive, tab_forecast = st.tabs(
-                ["Screening Results", "Deep Dive Analysis", "Forecast & Valuation"]
+            # Tabbed layout: Screening Results | Deep Dive | Forecast | Sector Analysis
+            tab_results, tab_deep_dive, tab_forecast, tab_sector = st.tabs(
+                ["Screening Results", "Deep Dive Analysis", "Forecast & Valuation", "Sector Analysis"]
             )
 
             with tab_results:
@@ -337,6 +348,7 @@ def main() -> None:
                     results_df_raw=results_df_raw,
                     screening_config=screening_config,
                     stocks_data=st.session_state.stocks_data,
+                    universe_df=st.session_state.universe_df,
                 )
 
             with tab_forecast:
@@ -344,6 +356,13 @@ def main() -> None:
                     results_df_raw=results_df_raw,
                     screening_config=screening_config,
                     stocks_data=st.session_state.stocks_data,
+                )
+
+            with tab_sector:
+                render_sector_section(
+                    universe_df=st.session_state.universe_df,
+                    results_df_raw=results_df_raw,
+                    screening_config=screening_config,
                 )
 
         else:
