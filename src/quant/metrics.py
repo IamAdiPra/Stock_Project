@@ -1248,7 +1248,7 @@ def calculate_data_confidence(data: dict) -> str:
 
 # ==================== HELPER: CALCULATE ALL METRICS ====================
 
-def calculate_all_metrics(data: dict) -> dict:
+def calculate_all_metrics(data: dict, skip_validation: bool = False) -> dict:
     """
     Calculate all metrics for a stock and return as dictionary.
 
@@ -1256,6 +1256,8 @@ def calculate_all_metrics(data: dict) -> dict:
 
     Args:
         data: Complete stock data (from fetch_deep_data)
+        skip_validation: If True, skip metric bounds validation (use when
+            metrics were already validated in a prior call, e.g. build_sector_universe)
 
     Returns:
         Dictionary with all calculated metrics
@@ -1278,14 +1280,17 @@ def calculate_all_metrics(data: dict) -> dict:
     distance_from_low = calculate_distance_from_low(data)
     near_low = is_near_52w_low(data, threshold_pct=10.0)
 
-    # Validate computed metrics against sanity bounds
-    validate_metric_bounds(ticker, "roic", roic)
-    validate_metric_bounds(ticker, "debt_to_equity", debt_to_equity)
+    # Validate computed metrics against sanity bounds (skip on second pass)
+    if not skip_validation:
+        validate_metric_bounds(ticker, "roic", roic)
+        # Skip D/E validation for sentinel value (999.0 = negative equity marker)
+        if debt_to_equity != 999.0:
+            validate_metric_bounds(ticker, "debt_to_equity", debt_to_equity)
 
-    # Validate trailing P/E from raw data (not computed, but worth flagging)
-    trailing_pe = data.get('trailingPE')
-    if trailing_pe is not None and not pd.isna(trailing_pe):
-        validate_metric_bounds(ticker, "trailing_pe", float(trailing_pe))
+        # Validate trailing P/E from raw data (not computed, but worth flagging)
+        trailing_pe = data.get('trailingPE')
+        if trailing_pe is not None and not pd.isna(trailing_pe):
+            validate_metric_bounds(ticker, "trailing_pe", float(trailing_pe))
 
     # Assess data completeness
     confidence = calculate_data_confidence(data)

@@ -19,9 +19,13 @@ from src.utils.config import (
 
 
 # Default concurrency for batch fetching
-# 5 workers × ~5 API calls/ticker = ~25 in-flight requests
-# Conservative enough to avoid Yahoo Finance rate limiting on 500-ticker runs
-DEFAULT_MAX_WORKERS: int = 5
+# 3 workers × ~5 API calls/ticker = ~15 in-flight requests
+# Conservative pacing to avoid Yahoo Finance rate limiting on 500-ticker runs
+DEFAULT_MAX_WORKERS: int = 3
+
+# Small delay (seconds) between processing completed futures in batch fetches
+# Smooths request bursts when multiple futures complete simultaneously
+INTER_TICKER_DELAY: float = 0.3
 
 
 def normalize_ticker(ticker: str, exchange: str = "NSE") -> str:
@@ -428,6 +432,7 @@ def batch_fetch_data(
                 log_data_issue(ticker, "fetch_failure", f"Thread error: {str(e)}")
             if progress_callback:
                 progress_callback(i, total)
+            time.sleep(INTER_TICKER_DELAY)
 
     return results
 
@@ -470,5 +475,6 @@ def batch_fetch_deep_data(
                 log_data_issue(ticker, "fetch_failure", f"Thread error: {str(e)}")
             if progress_callback:
                 progress_callback(i, total)
+            time.sleep(INTER_TICKER_DELAY)
 
     return results

@@ -314,7 +314,7 @@ def render_sidebar_footer() -> None:
             Combines fundamental health metrics (ROIC, FCF, D/E)
             with price-action discounting.<br><br>
             <strong>Data:</strong> yfinance&emsp;
-            <strong>Version:</strong> 1.6.0
+            <strong>Version:</strong> 1.6.1
         </div>""",
         unsafe_allow_html=True
     )

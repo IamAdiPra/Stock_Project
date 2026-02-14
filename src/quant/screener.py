@@ -541,7 +541,7 @@ def build_sector_universe(
         if data is None:
             continue
 
-        metrics = calculate_all_metrics(data)
+        metrics = calculate_all_metrics(data, skip_validation=True)
 
         rows.append({
             'ticker': ticker,

@@ -146,7 +146,7 @@ SP500_FULL: Final[List[str]] = [
     "GPC", "ROST", "DG", "MOH", "SYF",
 
     # --- Mid Cap ($15B-$25B) ---
-    "K", "NTAP", "HBAN", "BIIB", "DVN",
+    "NTAP", "HBAN", "BIIB", "DVN",
     "LVS", "MTD", "INTC", "KEYS",
     "EL", "LEN", "NVR", "PHM", "HPQ",
     "HPE", "GIS", "SYY", "MSCI",
@@ -167,15 +167,15 @@ SP500_FULL: Final[List[str]] = [
     # --- Lower Mid Cap ($10B-$15B) ---
     "BAX", "AES", "LNT", "EVRG", "ATO",
     "FDS", "LDOS", "PODD", "INCY", "CHD",
-    "IT", "GEN", "JNPR", "WDC", "FSLR",
+    "IT", "GEN", "WDC", "FSLR",
     "NDSN", "CHRW", "TRMB", "STE", "WRB",
     "CLX", "EPAM", "PAYC", "ZBRA", "AKAM",
-    "FFIV", "VTRS", "PKG", "WRK", "KBH",
+    "FFIV", "VTRS", "PKG", "KBH",
     "TPR", "MTCH", "MGM", "WYNN", "CZR",
     "LW", "BEN", "IVZ", "HSIC", "FMC",
     "CRL", "TECH", "BIO", "RL", "BWA",
     "APTV", "MHK", "AOS", "HII", "PNR",
-    "EMN", "CE", "SEE", "TXT", "RE",
+    "EMN", "CE", "SEE", "TXT",
     "AIZ", "NWS", "NWSA", "J", "LKQ",
 
     # --- Small-Mid Cap ($5B-$10B) ---
@@ -192,10 +192,10 @@ SP500_FULL: Final[List[str]] = [
     "HWM", "SOLV", "KVUE", "MRNA", "VEEV",
     "ZS", "EQT", "ENPH", "WBD", "ILMN",
     "ERIE", "ROL", "WST", "INVH", "CSGP",
-    "TROW", "L", "PFG", "IPG", "OMC",
+    "TROW", "L", "PFG", "OMC",
     "VRSN", "CPAY", "WHR", "XYL", "ALB",
     "MAS", "ITT", "ADM", "BG", "NOV",
-    "LNC", "UNM", "TPL", "PARA", "BBY",
+    "LNC", "UNM", "TPL", "BBY",
     "MCHP", "QRVO", "WY", "SMCI",
 ]
 

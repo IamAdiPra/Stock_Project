@@ -29,7 +29,7 @@
 
 ### Virtual Environment
 - **Active Environment**: `.venv` (local)
-- **Python Version**: 3.9.13+
+- **Python Version**: 3.12.9
 - **Activation Command**:
   ```bash
   .\.venv\Scripts\activate  # Windows
@@ -143,10 +143,19 @@ def fetch_ticker_data(ticker: str) -> dict:
 ## Current Status
 
 ### Version
-**v1.6.0** - Peer Comparison Panel
+**v1.6.1** - Data Quality Fixes (Duplicate Validation, Delisted Tickers, Rate Limiting)
 
 ### Last Implementation
-- **Peer Comparison Panel (v1.6.0)**:
+- **Data Quality Fixes (v1.6.1)**:
+  - `src/quant/metrics.py`: `calculate_all_metrics()` — new `skip_validation` parameter (default `False`). When `True`, skips all `validate_metric_bounds()` calls. Prevents duplicate validation errors when function is called multiple times per stock.
+  - `src/quant/metrics.py`: D/E sentinel guard — `validate_metric_bounds()` for `debt_to_equity` is now skipped when value equals `999.0` (our sentinel for negative equity). Eliminates ~30 false validation errors per SP500 run from companies like MCD, SBUX, HLT with share-buyback-induced negative equity.
+  - `src/quant/screener.py`: `build_sector_universe()` — calls `calculate_all_metrics(data, skip_validation=True)` since metrics were already validated during `screen_stocks()`.
+  - `src/utils/ticker_lists.py`: Removed 6 delisted/acquired SP500 tickers: K (Kellanova→Mars, Dec 2025), JNPR (Juniper→HPE, Jul 2025), WRK (WestRock→Smurfit Westrock, Jul 2024), RE (Everest→EG ticker change, Jul 2023), IPG (Interpublic→Omnicom, Nov 2025), PARA (Paramount→Skydance/PSKY, Aug 2025). EG already present in list. SP500_FULL: 495→489 tickers.
+  - `src/data/fetcher.py`: `DEFAULT_MAX_WORKERS` reduced from 5→3 (15 in-flight requests vs 25). Added `INTER_TICKER_DELAY = 0.3s` between completed futures in both `batch_fetch_data()` and `batch_fetch_deep_data()` to smooth request bursts.
+  - `src/ui/sidebar.py`: Version bumped to 1.6.1.
+  - `src/ui/components.py`: Footer version bumped to 1.6.1.
+
+- **Previous: Peer Comparison Panel (v1.6.0)**:
   - `src/ui/deep_dive.py`: NEW function `_get_sector_peers()` — finds 5-8 peers from `universe_df`, same industry first then sector, sorted by market cap proximity. Computes earnings_quality_score and distance_from_high for each peer via `calculate_all_metrics()`.
   - `src/ui/deep_dive.py`: NEW function `render_peer_comparison_section()` — orchestrator rendering comparison table + radar chart for selected stock vs peers.
   - `src/ui/deep_dive.py`: NEW function `_render_peer_table()` — Streamlit DataFrame with selected stock highlighted as first row, columns: Ticker, Company, ROIC, D/E, Market Cap, EQ Score.
@@ -415,12 +424,47 @@ def fetch_ticker_data(ticker: str) -> dict:
 
 ### Known Issues
 - FTSE_100 list has 99 tickers (SMDS removed due to acquisition) — add replacement when next constituent is confirmed
-- SP500_FULL has 495 tickers (FI, ANSS, HES, DFS removed — acquisitions/delistings)
+- SP500_FULL has 489 tickers (FI, ANSS, HES, DFS, K, JNPR, WRK, RE, IPG, PARA removed — acquisitions/delistings/ticker changes)
 - CBOE and NDAQ may show "Balance sheet data unavailable" — financial exchanges have non-standard statement formats
 
 ---
 
 ## Implementation History
+
+### 2026-02-14 (Session 26) - Data Quality Fixes (v1.6.1)
+**Bug Fixes** (`src/quant/metrics.py`, `src/quant/screener.py`, `src/utils/ticker_lists.py`, `src/data/fetcher.py`):
+
+**Problem 1: Duplicate Validation Errors (all markets)**
+- **Symptom**: Every validation error (D/E, P/E) appeared twice in Data Quality Report. NIFTY showed 4 issues instead of 2, SP500 showed 79 validation errors (half duplicates).
+- **Root Cause**: `calculate_all_metrics()` called twice per stock — once in `screen_stocks()` and once in `build_sector_universe()`. Each call triggered `validate_metric_bounds()` logging.
+- **Fix**: Added `skip_validation` parameter (default `False`) to `calculate_all_metrics()`. `build_sector_universe()` now passes `skip_validation=True`.
+
+**Problem 2: D/E Sentinel (999.0) Flooding Validation Report**
+- **Symptom**: ~30 SP500 stocks (MCD, SBUX, HLT, LOW, etc.) showed "debt_to_equity = 999.0000 exceeds upper bound (50.0)". These are companies with negative equity from share buybacks — not data errors.
+- **Root Cause**: `calculate_debt_to_equity()` returns 999.0 sentinel for negative equity (line 238). `validate_metric_bounds()` then flagged it as exceeding the 50.0 upper bound.
+- **Fix**: Skip D/E validation when value equals 999.0 (our own sentinel, not real data).
+
+**Problem 3: Delisted SP500 Tickers (6 tickers returning no data)**
+- K (Kellanova) — acquired by Mars, Dec 2025
+- JNPR (Juniper Networks) — acquired by HPE, Jul 2025
+- WRK (WestRock) — merged into Smurfit Westrock (SW), Jul 2024
+- RE (Everest Group) — ticker changed to EG, Jul 2023
+- IPG (Interpublic Group) — acquired by Omnicom, Nov 2025
+- PARA (Paramount Global) — merged into Skydance (PSKY), Aug 2025
+- **Fix**: Removed all 6 from `SP500_FULL`. EG already present. Net: 495→489 tickers.
+
+**Problem 4: Rate Limiting on SP500 (22 fetch failures)**
+- **Symptom**: ~22 tickers hit "Too Many Requests" during SP500 screening, especially toward end of batch.
+- **Root Cause**: 490 tickers × 5 API calls × 5 workers = burst of ~25 concurrent requests.
+- **Fix**: Reduced `DEFAULT_MAX_WORKERS` 5→3 (15 in-flight max). Added `INTER_TICKER_DELAY = 0.3s` between completed futures in both batch functions.
+
+**Expected Impact**:
+- SP500 validation errors: ~79→~10 (P/E outliers only, no D/E sentinel noise, no duplicates)
+- SP500 fetch failures: ~22→~5 (fewer rate limits with 3 workers + throttle)
+- SP500 incomplete data: ~53→~40 (6 dead tickers eliminated, some REITs genuinely have non-standard statements)
+- NIFTY validation errors: 4→2 (no more duplicates)
+- FTSE validation errors: 8→3 (no duplicates, no D/E sentinel)
+- Trade-off: SP500 fetch time increases ~30-40% (3 workers + 0.3s delay vs 5 workers), but dramatically fewer failures.
 
 ### 2026-02-13 (Session 25) - Peer Comparison Panel (v1.6.0)
 **Enhancement** (`src/ui/deep_dive.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`, `src/ui/components.py`):
@@ -1015,7 +1059,7 @@ def fetch_ticker_data(ticker: str) -> dict:
 **Technical Notes**:
 - `st.cache_data` is internally thread-safe (uses locks) — cached functions work from worker threads
 - `threading`, `concurrent.futures` are stdlib — no new dependencies
-- `typing.Callable` used for progress_callback type hint (Python 3.9 compatible)
+- `typing.Callable` used for progress_callback type hint
 - Expected performance: ~60-90 seconds for 100 tickers (vs 10+ minutes sequential)
 
 ### 2026-02-11 (Session 9) - FTSE Ticker Hardening & Anti-Throttle Session (v0.8.1)
@@ -1051,7 +1095,7 @@ def fetch_ticker_data(ticker: str) -> dict:
 - `requests` is already a transitive dependency of `yfinance` — no new pip install needed
 - User-Agent string uses Chrome 91 (widely recognized, low blocking risk)
 - Session singleton is NOT thread-safe, but Streamlit runs single-threaded per user
-- Python 3.9.13 compatibility maintained
+- Python 3.12.9 environment
 
 ### 2026-02-11 (Session 8) - Maintenance, Data Quality & FTSE 100 Expansion (v0.8.0)
 **Ticker Fixes (NIFTY 100)**:
@@ -1103,7 +1147,7 @@ def fetch_ticker_data(ticker: str) -> dict:
 **Technical Notes**:
 - FTSE_100 list should be updated quarterly as index constituents change
 - Some FTSE tickers share symbols with US tickers (BA=BAE Systems vs Boeing, AAL=Anglo American vs American Airlines) — no conflict since different exchange suffixes
-- Python 3.9.13 compatibility maintained (typing.Final, typing.List, typing.Optional)
+- Python 3.12.9 environment (typing.Final, typing.List, typing.Optional)
 - Version bumped to 0.8.0 in sidebar footer
 
 ### 2026-02-10 (Session 7) - Professional Analytics & Education Layer (v0.7.0)
@@ -1180,7 +1224,7 @@ def fetch_ticker_data(ticker: str) -> dict:
   - Historical prices still fetched per-ticker via cached fetch_historical_prices()
 
 **Technical Notes**:
-- Python 3.9.13 compatibility maintained (typing.Dict, typing.List, typing.Optional)
+- Python 3.12.9 environment (typing.Dict, typing.List, typing.Optional)
 - All new functions return Optional types with None/empty-list for graceful degradation
 - Bollinger Bands: first 19 rows have NaN (insufficient window) - Plotly handles gracefully
 - P/E chart shows "N/A" message for loss-making companies (avg_eps <= 0)
@@ -1215,7 +1259,7 @@ def fetch_ticker_data(ticker: str) -> dict:
   - Future-ready for filter-only updates without re-fetching
 
 **Technical Notes**:
-- Maintains Python 3.9.13 compatibility (typing.Optional, typing.Dict)
+- Python 3.12.9 environment (typing.Optional, typing.Dict legacy style retained)
 - Ticker lists assume pre-sorted by market cap (RELIANCE, TCS, INFY for Nifty; AAPL, MSFT, GOOGL for S&P)
 - BRK.B fix prevents yfinance fetch failures for class B shares
 - Session state now tracks previous config for smart re-fetch detection
@@ -1313,8 +1357,7 @@ def fetch_ticker_data(ticker: str) -> dict:
   - `components.py`: Reusable widgets (metric cards, tables, reports)
   - `app.py`: Orchestration only (no business logic)
 
-- **Python 3.9.13 Compatibility**: All type hints use `typing.Dict`, `typing.List`, `typing.Optional`, `typing.Any`
-  - No use of `dict[]`, `list[]` syntax (requires Python 3.9+)
+- **Typing Style**: Type hints use `typing.Dict`, `typing.List`, `typing.Optional`, `typing.Any` (legacy style, functional on 3.12; built-in generics available as optional modernization)
 
 - **Progressive Disclosure**: Data Quality Report in expander (collapsed if no issues)
   - Avoids overwhelming user with technical details
@@ -1664,5 +1707,5 @@ User Input (Tickers)
 
 ---
 
-**Last Updated**: 2026-02-13 (Session 25 - Peer Comparison Panel - v1.6.0)
+**Last Updated**: 2026-02-14 (Session 26 - Data Quality Fixes - v1.6.1)
 **Maintained By**: Claude (Senior Quant Developer)

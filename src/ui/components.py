@@ -406,7 +406,7 @@ def render_footer() -> None:
             Not investment advice. Always conduct your own due diligence.<br>
             Built with Streamlit, Plotly, yfinance &nbsp;&bull;&nbsp;
             Fundamentals: 24h cache &nbsp;&bull;&nbsp; Price: 1h cache &nbsp;&bull;&nbsp;
-            <strong>Stock Value Screener v1.6.0</strong>
+            <strong>Stock Value Screener v1.6.1</strong>
         </div>""",
         unsafe_allow_html=True
     )
