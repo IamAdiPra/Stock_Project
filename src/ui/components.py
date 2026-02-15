@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 import pandas as pd
 import streamlit as st
 from src.utils.logger import get_data_quality_log, get_failure_summary
+from src.utils.config import VIX_THRESHOLDS
 from src.ui.styles import COLORS, metric_card, top_pick_card, section_header
 
 
@@ -47,6 +48,75 @@ def render_metric_cards(total_screened: int, passed_filters: int) -> None:
             ),
             unsafe_allow_html=True
         )
+
+
+def render_macro_context(macro_data: Dict[str, Optional[Dict[str, Any]]]) -> None:
+    """
+    Render macro indicator cards in a 4-column row.
+
+    VIX uses traffic-light accent coloring:
+    - Green: < 15 (low fear)
+    - Amber: 15-25 (moderate)
+    - Red: > 25 (high fear)
+
+    Other indicators use neutral blue accent.
+
+    Args:
+        macro_data: Dict from fetch_macro_indicators(), keys are indicator IDs
+    """
+    vix_green, vix_amber = VIX_THRESHOLDS
+
+    col1, col2, col3, col4 = st.columns(4)
+    columns = {"US10Y": col1, "VIX": col2, "DXY": col3, "OIL": col4}
+
+    for key, col in columns.items():
+        data = macro_data.get(key)
+
+        with col:
+            if data is None:
+                st.markdown(
+                    metric_card(label=key, value="N/A", accent="blue"),
+                    unsafe_allow_html=True,
+                )
+                continue
+
+            value = data["value"]
+            change_pct = data["change_pct"]
+            label = data["label"]
+            unit = data["unit"]
+
+            # Format value
+            if key == "US10Y":
+                value_str = f"{value:.2f}%"
+            elif key == "OIL":
+                value_str = f"${value:.2f}"
+            else:
+                value_str = f"{value:.2f}"
+
+            # Format delta
+            sign = "+" if change_pct >= 0 else ""
+            delta_str = f"{sign}{change_pct:.2f}%"
+
+            # Determine accent color
+            if key == "VIX":
+                if value < vix_green:
+                    accent = "green"
+                elif value <= vix_amber:
+                    accent = "amber"
+                else:
+                    accent = "red"
+            else:
+                accent = "blue"
+
+            st.markdown(
+                metric_card(
+                    label=label,
+                    value=value_str,
+                    delta=delta_str,
+                    accent=accent,
+                ),
+                unsafe_allow_html=True,
+            )
 
 
 def render_top_5_cards(results_df_raw: pd.DataFrame) -> None:
@@ -138,63 +208,74 @@ def render_results_table(
         'confidence': st.column_config.TextColumn(
             'Confidence',
             width='small',
-            help="Data completeness: High = all 3 statements with 3+ years + beta. "
-                 "Medium = all statements but missing years or beta. "
-                 "Low = missing financial statements."
+            help="How complete the financial data is for a stock. "
+                 "Like a report card: High = all grades available, Low = missing half the subjects. "
+                 "Good: High confidence (more reliable metrics)"
         ),
         'roic_pct': st.column_config.TextColumn(
             'ROIC',
             width='small',
-            help="Return on Invested Capital: how efficiently the company converts "
-                 "invested capital into profit. Above 15% is excellent."
+            help="How efficiently a company converts invested money into profit. "
+                 "Like getting ₹15 profit for every ₹100 you invest in a business. "
+                 "Good: > 15% (Warren Buffett's baseline)"
         ),
         'de_ratio': st.column_config.TextColumn(
             'D/E',
             width='small',
-            help="Debt-to-Equity Ratio: total debt divided by total equity. "
-                 "Below 0.8 indicates conservative financial leverage."
+            help="How much money a company owes compared to what it owns. "
+                 "Like comparing your home loan to your savings account balance. "
+                 "Good: < 0.8 (less debt = more stable)"
         ),
         'value_score': st.column_config.TextColumn(
             'Value Score',
             width='small',
-            help="Composite score: 60% quality (ROIC) + 40% price discount from peak. "
-                 "Higher score = better value opportunity."
+            help="Combined ranking of quality (ROIC 60%) and price discount (40%). "
+                 "Like grading a deal: A+ quality product at 40% off = high value score. "
+                 "Good: > 0.7 (top 30% of filtered stocks)"
         ),
         'momentum_score_fmt': st.column_config.TextColumn(
             'Momentum',
             width='small',
-            help="Momentum Score (0-100). Combines RSI (35%), MACD (35%), "
-                 "and SMA crossover (30%). Higher = stronger upward momentum. "
-                 "Sweet spot for value investors: 50-80."
+            help="Measures if a stock's price trend is improving (0-100). "
+                 "Like a report card combining multiple grades into one GPA. "
+                 "Good: > 60 (strong momentum, price likely to continue rising)"
         ),
         'earnings_quality_fmt': st.column_config.TextColumn(
             'EQ Score',
             width='small',
-            help="Earnings Quality Score (0-100). Combines accrual ratio, "
-                 "FCF/Net Income ratio, and revenue vs receivables growth. "
-                 "70+ = High quality, 40-69 = Medium, Below 40 = Low."
+            help="How trustworthy a company's reported profits are (0-100). "
+                 "Like a report card showing if grades are real or inflated. "
+                 "Good: > 70 (high-quality, cash-backed earnings)"
         ),
-        'market_cap_fmt': st.column_config.TextColumn('Market Cap', width='small'),
+        'market_cap_fmt': st.column_config.TextColumn(
+            'Market Cap',
+            width='small',
+            help="The total value of all a company's shares combined. "
+                 "Like the price if you wanted to buy an entire company at today's stock price."
+        ),
         'current_price_fmt': st.column_config.TextColumn(
             'Price',
             width='small',
-            help="Current trading price"
+            help="Current trading price per share"
         ),
         'fifty_two_week_high_fmt': st.column_config.TextColumn(
             '52w High',
             width='small',
-            help="Highest trading price in the last 52 weeks"
+            help="The highest price a stock reached in the past year. "
+                 "Like the most expensive a toy has been in the last 12 months."
         ),
         'fifty_two_week_low_fmt': st.column_config.TextColumn(
             '52w Low',
             width='small',
-            help="Lowest trading price in the last 52 weeks"
+            help="The lowest price a stock reached in the past year. "
+                 "Like the cheapest a toy has been in the last 12 months (might be on sale!)"
         ),
         'discount_pct': st.column_config.TextColumn(
             '% from High',
             width='small',
-            help="How far below the 52-week high (negative = below peak). "
-                 "Larger discounts may signal value opportunities."
+            help="How far below its peak price a stock is currently trading. "
+                 "Like a discount label showing 30% off the original price. "
+                 "Good: -20% or more (stock on sale, but check why it dropped!)"
         ),
         'distance_from_low': st.column_config.NumberColumn(
             '% Above Low',
@@ -406,7 +487,7 @@ def render_footer() -> None:
             Not investment advice. Always conduct your own due diligence.<br>
             Built with Streamlit, Plotly, yfinance &nbsp;&bull;&nbsp;
             Fundamentals: 24h cache &nbsp;&bull;&nbsp; Price: 1h cache &nbsp;&bull;&nbsp;
-            <strong>Stock Value Screener v1.6.1</strong>
+            <strong>Stock Value Screener v1.10.0</strong>
         </div>""",
         unsafe_allow_html=True
     )

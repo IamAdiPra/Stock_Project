@@ -304,6 +304,29 @@ def section_header(text: str) -> str:
     """
 
 
+def info_icon(term: str, position: str = "right") -> str:
+    """
+    Returns HTML for an info icon with hover tooltip.
+
+    Args:
+        term: Financial term key (e.g., "ROIC", "Beta", "P/E")
+        position: "right" or "below" (tooltip position)
+
+    Returns:
+        HTML string with icon + CSS-only hover tooltip
+    """
+    try:
+        from src.ui.glossary import get_simple_explanation
+        explanation = get_simple_explanation(term)
+    except ImportError:
+        explanation = f"Definition for {term}"
+
+    # Escape quotes in explanation to prevent HTML attribute issues
+    safe_explanation = explanation.replace('"', '&quot;').replace("'", "&#39;")
+
+    return f"""<span class="info-icon-wrapper"><span class="info-icon" title="{safe_explanation}">ℹ️</span><span class="info-tooltip {position}">{explanation}</span></span>"""
+
+
 # ==================== GLOBAL CSS ====================
 
 def get_global_css() -> str:
@@ -540,5 +563,73 @@ def get_global_css() -> str:
     .stProgress > div > div {{
         background: linear-gradient(90deg, {COLORS['accent_blue']}, {COLORS['accent_purple']}) !important;
         border-radius: 4px !important;
+    }}
+
+    /* ===== Info Icon Tooltips ===== */
+    .info-icon-wrapper {{
+        position: relative;
+        display: inline-block;
+        margin-left: 4px;
+        vertical-align: middle;
+    }}
+
+    .info-icon {{
+        cursor: help;
+        font-size: 0.85em;
+        opacity: 0.6;
+        transition: opacity 0.2s ease;
+        user-select: none;
+    }}
+
+    .info-icon:hover {{
+        opacity: 1.0;
+    }}
+
+    .info-tooltip {{
+        visibility: hidden;
+        position: absolute;
+        background: {COLORS['surface_elevated']};
+        color: {COLORS['text_primary']};
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        width: 250px;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        border: 1px solid {COLORS['border']};
+        pointer-events: none;
+        transition: visibility 0s, opacity 0.2s ease;
+        opacity: 0;
+    }}
+
+    .info-tooltip.right {{
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 8px;
+    }}
+
+    .info-tooltip.below {{
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-top: 8px;
+    }}
+
+    .info-icon-wrapper:hover .info-tooltip {{
+        visibility: visible;
+        opacity: 1;
+    }}
+
+    /* Mobile: Switch tooltips to below on narrow screens */
+    @media (max-width: 768px) {{
+        .info-tooltip.right {{
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-left: 0;
+            margin-top: 8px;
+        }}
     }}
     """

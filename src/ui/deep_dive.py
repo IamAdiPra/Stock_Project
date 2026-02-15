@@ -330,11 +330,12 @@ def create_price_bollinger_chart(
         ),
         yaxis_title=f"Price ({currency_symbol})",
         xaxis_title="Date",
-        xaxis=dict(rangeslider=dict(visible=False)),
         height=500,
         margin=dict(l=60, r=40, t=80, b=60),
         hovermode='x unified',
     )
+
+    fig.update_xaxes(rangeslider=dict(visible=False))
 
     return fig
 

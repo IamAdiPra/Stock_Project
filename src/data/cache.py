@@ -2,7 +2,7 @@
 Caching layer using Streamlit's @st.cache_data decorator.
 Implements dual TTL strategy: 24h for fundamentals, 1h for price data.
 
-NOTE: Compatible with Python 3.9+ (no ParamSpec dependency)
+NOTE: Requires Python 3.12+ (project runs on 3.12.9)
 """
 
 import streamlit as st

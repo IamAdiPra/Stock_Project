@@ -206,93 +206,59 @@ def render_sidebar() -> Dict[str, Any]:
 
 def render_quant_mentor() -> None:
     """
-    Render the 'How to Read This' educational expander in the sidebar.
-    Contains a financial glossary with plain-English explanations.
+    Render the Financial Dictionary expander in the sidebar.
+    Searchable glossary with 80+ financial terms explained like to a 10-year-old.
     """
-    with st.sidebar.expander("How to Read This", expanded=False):
-        st.markdown(
-            "**ROIC** (Return on Invested Capital)\n"
-            "How much profit the company makes for every $1 of capital invested. "
-            "Above 15% = Excellent. Below 10% = Concerning."
+    from src.ui.glossary import (
+        search_glossary,
+        get_category_terms,
+        render_glossary_card,
+        get_all_categories,
+        FINANCIAL_GLOSSARY
+    )
+
+    with st.sidebar.expander("📚 Financial Dictionary", expanded=False):
+        # Search box
+        search_query = st.text_input(
+            "Search terms...",
+            placeholder="e.g., ROIC, Beta, Sharpe",
+            key="glossary_search",
+            label_visibility="collapsed"
         )
-        st.markdown(
-            "**Debt/Equity Ratio**\n"
-            "How much the company owes vs what it owns. "
-            "Think of it as household leverage: mortgage vs home equity. "
-            "Below 0.5 = Conservative. Above 1.5 = Aggressive."
+
+        # Category filter
+        all_categories = ["All"] + get_all_categories()
+        category = st.selectbox(
+            "Filter by category",
+            all_categories,
+            key="glossary_category",
+            label_visibility="collapsed"
         )
-        st.markdown(
-            "**Free Cash Flow (FCF)**\n"
-            "Cash left over after running the business and reinvesting in growth. "
-            "3 consecutive positive years = healthy cash engine."
-        )
-        st.markdown(
-            "**Value Score**\n"
-            "Composite metric: 60% quality (ROIC) + 40% price discount from peak. "
-            "Higher = a great business on sale."
-        )
-        st.markdown(
-            "**Bollinger Bands**\n"
-            "Statistical 'safety rails' around a stock's price "
-            "(20-day average +/- 2 standard deviations). "
-            "Price near the bottom band may signal oversold conditions. "
-            "Not a buy signal alone - combine with fundamental quality."
-        )
-        st.markdown(
-            "**Mean Reversion (P/E)**\n"
-            "The idea that a stock's P/E ratio tends to return to its long-term average. "
-            "Current P/E below 3-year average = potentially undervalued. "
-            "Above = potentially overvalued."
-        )
-        st.markdown(
-            "**Earnings Quality (0-100)**\n"
-            "How trustworthy are the reported earnings? Combines three signals: "
-            "Accrual Ratio (cash vs reported income), "
-            "FCF/Net Income (cash conversion), and "
-            "Revenue vs Receivables growth (collection health). "
-            "Above 70 = High quality. Below 40 = Caution."
-        )
-        st.markdown(
-            "**52-Week High/Low**\n"
-            "The highest and lowest prices over the past year. "
-            "Stocks near 52-week lows with strong fundamentals = potential value opportunities."
-        )
-        st.markdown(
-            "**RSI** (Relative Strength Index)\n"
-            "Measures speed/magnitude of recent price changes (0-100). "
-            "Below 30 = oversold, Above 70 = overbought. "
-            "For value investors, RSI 30-55 is the sweet spot (recovering, not overheated)."
-        )
-        st.markdown(
-            "**MACD** (Moving Average Convergence Divergence)\n"
-            "Shows the relationship between two moving averages of price. "
-            "MACD above signal line = bullish momentum. "
-            "Histogram shows the gap — growing histogram = strengthening trend."
-        )
-        st.markdown(
-            "**Golden Cross / Death Cross**\n"
-            "Golden Cross: 50-day SMA crosses above 200-day SMA (bullish trend). "
-            "Death Cross: 50-day crosses below 200-day (bearish trend). "
-            "Widely followed by institutional traders."
-        )
-        st.markdown(
-            "**Momentum Score (0-100)**\n"
-            "Composite of RSI (35%), MACD (35%), and SMA crossover (30%). "
-            "Higher = stronger upward momentum. "
-            "Hybrid Ranking blends 70% Value Score + 30% Momentum Score."
-        )
-        st.markdown(
-            "**Sector Analysis**\n"
-            "Groups stocks by GICS sector (Technology, Healthcare, Financials, etc.) "
-            "to show sector-level aggregates. The treemap sizes sectors by market cap "
-            "and colors by average ROIC. The sector-relative view shows whether a "
-            "filtered stock outperforms or underperforms its sector median.\n\n"
-            "**Peer Comparison**\n"
-            "In Deep Dive, compares a stock against 5-8 peers from the same sector/industry. "
-            "The radar chart normalizes 5 dimensions (ROIC, Capital Efficiency, Scale, "
-            "Earnings Quality, Price Discount) to 0-100 within the peer group. "
-            "Outward = stronger on that dimension."
-        )
+
+        # Spacer
+        st.markdown("<div style='margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+        # Render filtered glossary
+        if search_query:
+            results = search_glossary(search_query)
+            if results:
+                st.caption(f"✓ {len(results)} term{'s' if len(results) > 1 else ''} found")
+                for term in results:
+                    st.markdown(render_glossary_card(term), unsafe_allow_html=True)
+            else:
+                st.caption("No matching terms found. Try 'ROIC', 'Beta', or 'Sharpe'.")
+        else:
+            # Get terms for selected category
+            if category == "All":
+                terms = sorted(FINANCIAL_GLOSSARY.keys())
+            else:
+                terms = get_category_terms(category)
+
+            st.caption(f"📖 Showing {len(terms)} term{'s' if len(terms) > 1 else ''}")
+
+            # Render cards
+            for term in terms:
+                st.markdown(render_glossary_card(term), unsafe_allow_html=True)
 
 
 def render_sidebar_footer() -> None:
@@ -314,7 +280,7 @@ def render_sidebar_footer() -> None:
             Combines fundamental health metrics (ROIC, FCF, D/E)
             with price-action discounting.<br><br>
             <strong>Data:</strong> yfinance&emsp;
-            <strong>Version:</strong> 1.6.1
+            <strong>Version:</strong> 1.10.0
         </div>""",
         unsafe_allow_html=True
     )

@@ -64,6 +64,25 @@ def get_currency_symbol(index: str) -> str:
     return CURRENCY_CONFIG.get(index, CURRENCY_CONFIG["SP500"])["symbol"]
 
 
+def convert_gbx_to_gbp(value: float, index: str) -> float:
+    """
+    Convert GBX (pence) to GBP (pounds) for FTSE100 stocks.
+
+    Yahoo Finance returns LSE stock prices in pence (GBX) but we display in pounds (GBP).
+    For non-FTSE indices, returns value unchanged.
+
+    Args:
+        value: Price or financial value (potentially in pence)
+        index: Index identifier ("NIFTY100", "SP500", "FTSE100")
+
+    Returns:
+        Converted value (divided by 100 for FTSE100, unchanged otherwise)
+    """
+    if index == "FTSE100" and value is not None:
+        return value / 100.0
+    return value
+
+
 # ==================== SCREENING THRESHOLDS ====================
 # Default values for quality filters
 
@@ -186,6 +205,51 @@ CHART_COLOR_BULL: Final[str] = "#10B981"    # Emerald green
 CHART_COLOR_BASE: Final[str] = "#6366F1"    # Indigo blue
 CHART_COLOR_BEAR: Final[str] = "#EF4444"    # Rose red
 CHART_COLOR_MARKET: Final[str] = "#8B5CF6"  # Violet purple
+
+# ==================== MACRO OVERLAY CONFIGURATION ====================
+
+# Macro indicator tickers (yfinance symbols)
+MACRO_INDICATORS: Final[Dict[str, Dict[str, str]]] = {
+    "US10Y": {"ticker": "^TNX", "label": "US 10Y Yield", "unit": "%"},
+    "VIX": {"ticker": "^VIX", "label": "VIX (Fear Index)", "unit": ""},
+    "DXY": {"ticker": "DX-Y.NYB", "label": "US Dollar Index", "unit": ""},
+    "OIL": {"ticker": "CL=F", "label": "Crude Oil (WTI)", "unit": "$"},
+}
+
+# VIX traffic-light thresholds: (green_upper, amber_upper)
+# Green: <15 (low fear), Amber: 15-25 (moderate), Red: >25 (high fear)
+VIX_THRESHOLDS: Final[Tuple[float, float]] = (15.0, 25.0)
+
+# Macro data cache TTL — 30 minutes (more frequent than stock price cache)
+MACRO_DATA_TTL: Final[int] = 1800  # 30 minutes (60*30)
+
+# ==================== BACKTEST CONFIGURATION ====================
+
+# Benchmark index tickers for backtest comparison
+BENCHMARK_TICKERS: Final[Dict[str, str]] = {
+    "NIFTY100": "^NSEI",    # Nifty 50 index
+    "SP500": "^GSPC",        # S&P 500 index
+    "FTSE100": "^FTSE",      # FTSE 100 index
+}
+
+# Backtest lookback periods in approximate trading days
+BACKTEST_PERIODS: Final[Dict[str, int]] = {
+    "1Y": 252,
+    "3Y": 756,
+    "5Y": 1260,
+}
+
+# ==================== PORTFOLIO CONFIGURATION ====================
+
+# Concentration limits by risk tolerance (max weight per stock)
+PORTFOLIO_CONCENTRATION_LIMITS: Final[Dict[str, float]] = {
+    "Conservative": 0.15,    # Max 15% per stock
+    "Moderate": 0.20,        # Max 20% per stock
+    "Aggressive": 0.30,      # Max 30% per stock
+}
+
+# Default investment amount for portfolio builder
+PORTFOLIO_DEFAULT_AMOUNT: Final[int] = 100_000
 
 # ==================== DATA QUALITY ====================
 

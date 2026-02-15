@@ -356,6 +356,42 @@ def fetch_cashflow_statement(ticker: str) -> Optional[pd.DataFrame]:
     )
 
 
+def _normalize_lse_prices(data: dict, exchange: str) -> dict:
+    """
+    Convert GBX (pence) to GBP (pounds) for LSE stocks.
+
+    Yahoo Finance returns LSE stock prices in pence but financial statements are in pounds.
+    This causes 100x mismatches in P/E calculations and price displays.
+
+    Args:
+        data: Stock data dictionary with price fields
+        exchange: Exchange identifier ("LSE", "NSE", etc.)
+
+    Returns:
+        Modified data dict with converted prices (LSE only)
+    """
+    if exchange != "LSE":
+        return data
+
+    # Price fields that need GBX -> GBP conversion
+    price_fields = [
+        'currentPrice',
+        'fiftyTwoWeekHigh',
+        'fiftyTwoWeekLow',
+        'regularMarketPrice',
+        'previousClose',
+        'open',
+        'dayLow',
+        'dayHigh',
+    ]
+
+    for field in price_fields:
+        if field in data and data[field] is not None:
+            data[field] = data[field] / 100.0
+
+    return data
+
+
 def fetch_deep_data(ticker: str, exchange: str = "NSE") -> Optional[dict]:
     """
     Fetch comprehensive financial data including statements (for deep analysis).
@@ -380,6 +416,9 @@ def fetch_deep_data(ticker: str, exchange: str = "NSE") -> Optional[dict]:
 
     if complete_data is None:
         return None
+
+    # Normalize LSE prices (GBX -> GBP conversion)
+    complete_data = _normalize_lse_prices(complete_data, exchange)
 
     # Fetch financial statements
     income_stmt = fetch_income_statement(normalized_ticker)

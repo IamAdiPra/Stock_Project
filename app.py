@@ -9,6 +9,7 @@ import pandas as pd
 
 # Data Layer
 from src.data.fetcher import batch_fetch_deep_data
+from src.data.macro_fetcher import fetch_macro_indicators
 from src.utils.ticker_lists import get_all_tickers, get_ticker_count
 from src.utils.logger import clear_data_quality_log
 
@@ -21,9 +22,12 @@ from src.ui.visualizations import create_value_scatter_plot
 from src.ui.deep_dive import render_deep_dive_section
 from src.ui.forecast_tab import render_forecast_section
 from src.ui.sector_tab import render_sector_section
+from src.ui.portfolio_tab import render_portfolio_section
+from src.ui.backtest_tab import render_backtest_section
 from src.ui.components import (
     render_header,
     render_metric_cards,
+    render_macro_context,
     render_results_table,
     render_data_quality_report,
     render_empty_state,
@@ -293,13 +297,24 @@ def main() -> None:
 
         # Main Results Display
         if not results_df_raw.empty:
-            # Tabbed layout: Screening Results | Deep Dive | Forecast | Sector Analysis
-            tab_results, tab_deep_dive, tab_forecast, tab_sector = st.tabs(
-                ["Screening Results", "Deep Dive Analysis", "Forecast & Valuation", "Sector Analysis"]
+            # Tabbed layout: Screening Results | Deep Dive | Forecast | Sector Analysis | Portfolio | Backtest
+            tab_results, tab_deep_dive, tab_forecast, tab_sector, tab_portfolio, tab_backtest = st.tabs(
+                ["Screening Results", "Deep Dive Analysis", "Forecast & Valuation", "Sector Analysis", "Portfolio Builder", "Backtest"]
             )
 
             with tab_results:
                 st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+                # Market Context — macro indicator cards
+                try:
+                    macro_data = fetch_macro_indicators()
+                    # Only render if at least one indicator succeeded
+                    if any(v is not None for v in macro_data.values()):
+                        st.markdown(section_header("Market Context"), unsafe_allow_html=True)
+                        render_macro_context(macro_data)
+                        st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+                except Exception:
+                    pass  # Macro fetch failure never blocks screening results
 
                 # Create two columns: Scatter plot (left), Summary stats (right)
                 col1, col2 = st.columns([2, 1])
@@ -361,6 +376,19 @@ def main() -> None:
             with tab_sector:
                 render_sector_section(
                     universe_df=st.session_state.universe_df,
+                    results_df_raw=results_df_raw,
+                    screening_config=screening_config,
+                )
+
+            with tab_portfolio:
+                render_portfolio_section(
+                    results_df_raw=results_df_raw,
+                    screening_config=screening_config,
+                    stocks_data=st.session_state.stocks_data,
+                )
+
+            with tab_backtest:
+                render_backtest_section(
                     results_df_raw=results_df_raw,
                     screening_config=screening_config,
                 )

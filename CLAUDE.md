@@ -143,10 +143,62 @@ def fetch_ticker_data(ticker: str) -> dict:
 ## Current Status
 
 ### Version
-**v1.6.1** - Data Quality Fixes (Duplicate Validation, Delisted Tickers, Rate Limiting)
+**v1.9.0** - Backtest (Limited)
 
 ### Last Implementation
-- **Data Quality Fixes (v1.6.1)**:
+- **Backtest (v1.9.0)**:
+  - `src/quant/backtest.py`: NEW FILE (~230 lines) — historical backtest engine
+  - `src/quant/backtest.py`: `_fetch_and_slice_prices(ticker, start_date)` — fetches 5y cached prices via `fetch_historical_prices()`, slices from start_date forward. Returns None if <20 data points.
+  - `src/quant/backtest.py`: `_build_portfolio_cumulative(tickers, index, start_date)` — builds equal-weight daily returns and cumulative return series. Computes per-stock total returns. Returns None if <2 tickers have data.
+  - `src/quant/backtest.py`: `_build_benchmark_cumulative(index, start_date)` — fetches benchmark index prices from `BENCHMARK_TICKERS` config, returns cumulative return series.
+  - `src/quant/backtest.py`: `_compute_metrics(portfolio_daily, portfolio_cumulative, benchmark_cumulative, risk_free_rate, trading_days)` — total return, annualized return, benchmark return, alpha (annualized portfolio - annualized benchmark), max drawdown, Sharpe ratio, volatility.
+  - `src/quant/backtest.py`: `run_backtest(results_df, index, period)` — orchestrator: computes start date from period, builds portfolio + benchmark cumulative, computes metrics + per-stock details + win rate. Returns dict with all data for UI.
+  - `src/ui/backtest_tab.py`: NEW FILE (~250 lines) — Backtest tab UI
+  - `src/ui/backtest_tab.py`: `render_backtest_section()` — main entry point with survivorship bias disclaimer, period selector, metrics cards, performance chart, stock table.
+  - `src/ui/backtest_tab.py`: `_render_disclaimer()` — amber-bordered card warning about survivorship bias and current-fundamentals limitation.
+  - `src/ui/backtest_tab.py`: `_render_metrics_cards()` — 5 metric cards: Total Return, Annualized Return, Alpha vs Benchmark, Max Drawdown, Win Rate.
+  - `src/ui/backtest_tab.py`: `_create_performance_chart()` — 2-line Plotly chart: portfolio (emerald solid) vs benchmark (violet dotted), y-axis in cumulative return %, zero reference line.
+  - `src/ui/backtest_tab.py`: `_render_stock_table()` — per-stock returns DataFrame with ticker, company, total return %, beat benchmark (Yes/No).
+  - `src/utils/config.py`: Added `BENCHMARK_TICKERS` dict — NIFTY100: "^NSEI", SP500: "^GSPC", FTSE100: "^FTSE".
+  - `src/utils/config.py`: Added `BACKTEST_PERIODS` dict — 1Y: 252, 3Y: 756, 5Y: 1260 trading days.
+  - `app.py`: 6th tab "Backtest" added. `render_backtest_section()` receives `results_df_raw`, `screening_config`.
+  - `src/ui/sidebar.py`: Added "Backtest" entry to Quant Mentor glossary. Version bumped to 1.9.0.
+  - `src/ui/components.py`: Footer version bumped to 1.9.0.
+
+- **Previous: Portfolio Builder (v1.8.0)**:
+  - `src/quant/portfolio.py`: NEW FILE (~250 lines) — portfolio construction engine
+  - `src/quant/portfolio.py`: `build_returns_matrix()` — fetches 1y cached prices via `fetch_historical_prices()`, builds daily returns DataFrame for valid tickers (>20 data points). Returns None if <2 tickers have data.
+  - `src/quant/portfolio.py`: `allocate_equal_weight(n)` — uniform 1/N weights.
+  - `src/quant/portfolio.py`: `allocate_inverse_volatility(cov_matrix)` — weight inversely proportional to annualized vol, normalized to sum=1.
+  - `src/quant/portfolio.py`: `allocate_max_diversification(cov_matrix)` — iterative risk-parity variant that equalizes risk contribution relative to volatility. No scipy dependency — uses numpy-only iterative proportional fitting (1000 iterations, 1e-8 convergence threshold).
+  - `src/quant/portfolio.py`: `apply_concentration_limits(weights, max_weight)` — iterative clipping with proportional redistribution to enforce per-stock caps.
+  - `src/quant/portfolio.py`: `compute_portfolio_metrics(weights, returns_matrix, risk_free_rate)` — expected return (annualized mean), portfolio volatility (annualized std), Sharpe ratio, max drawdown from historical weighted returns.
+  - `src/quant/portfolio.py`: `build_portfolio()` — orchestrator: builds returns matrix, computes covariance, runs selected allocation method, applies concentration limits, computes metrics, returns allocations + metrics + correlation matrix.
+  - `src/ui/portfolio_tab.py`: NEW FILE (~250 lines) — Portfolio Builder tab UI
+  - `src/ui/portfolio_tab.py`: `render_portfolio_section()` — main entry point with in-tab inputs (investment amount, risk tolerance radio, allocation method selectbox), allocation table, pie chart, metrics cards, correlation heatmap.
+  - `src/ui/portfolio_tab.py`: `_render_metrics_cards()` — 4 metric cards with conditional accent colors: Expected Return, Portfolio Volatility, Sharpe Ratio, Max Drawdown.
+  - `src/ui/portfolio_tab.py`: `_render_allocation_table()` — Streamlit DataFrame with Ticker, Company, Weight %, Amount, ROIC, Value Score. CSV download button.
+  - `src/ui/portfolio_tab.py`: `_create_allocation_pie()` — Plotly donut chart with 10-color palette cycling, dark theme.
+  - `src/ui/portfolio_tab.py`: `_create_correlation_heatmap()` — Plotly heatmap (blue→surface→red), annotated with correlation values, dark theme.
+  - `src/utils/config.py`: Added `PORTFOLIO_CONCENTRATION_LIMITS` dict — Conservative: 15%, Moderate: 20%, Aggressive: 30%.
+  - `src/utils/config.py`: Added `PORTFOLIO_DEFAULT_AMOUNT = 100_000`.
+  - `app.py`: 5th tab "Portfolio Builder" added. `render_portfolio_section()` receives `results_df_raw`, `screening_config`, `stocks_data`.
+  - `src/ui/sidebar.py`: Added "Portfolio Builder" entry to Quant Mentor glossary. Version bumped to 1.8.0.
+  - `src/ui/components.py`: Footer version bumped to 1.8.0.
+
+- **Previous: Macro Overlay Dashboard (v1.7.0)**:
+  - `src/data/macro_fetcher.py`: NEW FILE — standalone macro indicator fetcher
+  - `src/data/macro_fetcher.py`: `_fetch_single_indicator()` — fetches 5-day history via `yf.Ticker().history()`, extracts latest close + daily change %. Cached with `@st.cache_data(ttl=1800)` (30 minutes).
+  - `src/data/macro_fetcher.py`: `fetch_macro_indicators()` — orchestrator fetching all 4 indicators independently (one failure doesn't block others). Returns dict mapping key to `{value, change_pct, label, unit}`.
+  - `src/utils/config.py`: Added `MACRO_INDICATORS` dict — 4 indicators: US10Y (`^TNX`), VIX (`^VIX`), DXY (`DX-Y.NYB`), OIL (`CL=F`) with labels and units.
+  - `src/utils/config.py`: Added `VIX_THRESHOLDS = (15.0, 25.0)` for green/amber/red traffic-light cutoffs.
+  - `src/utils/config.py`: Added `MACRO_DATA_TTL = 1800` (30-minute cache).
+  - `src/ui/components.py`: NEW function `render_macro_context()` — renders 4 metric cards in a row. VIX accent: green (<15), amber (15-25), red (>25). Others use blue accent. Shows daily change % as delta.
+  - `app.py`: Macro context rendered atop Screening Results tab between info banner and scatter plot. Wrapped in try/except — never blocks screening results.
+  - `src/ui/sidebar.py`: Added "Market Context" entry to Quant Mentor glossary. Version bumped to 1.7.0.
+  - `src/ui/components.py`: Footer version bumped to 1.7.0.
+
+- **Previous: Data Quality Fixes (v1.6.1)**:
   - `src/quant/metrics.py`: `calculate_all_metrics()` — new `skip_validation` parameter (default `False`). When `True`, skips all `validate_metric_bounds()` calls. Prevents duplicate validation errors when function is called multiple times per stock.
   - `src/quant/metrics.py`: D/E sentinel guard — `validate_metric_bounds()` for `debt_to_equity` is now skipped when value equals `999.0` (our sentinel for negative equity). Eliminates ~30 false validation errors per SP500 run from companies like MCD, SBUX, HLT with share-buyback-induced negative equity.
   - `src/quant/screener.py`: `build_sector_universe()` — calls `calculate_all_metrics(data, skip_validation=True)` since metrics were already validated during `screen_stocks()`.
@@ -421,6 +473,9 @@ def fetch_ticker_data(ticker: str) -> dict:
 21. ✅ ~~Momentum Signals (RSI/MACD/SMA with composite score and hybrid ranking)~~
 22. ✅ ~~Sector Analysis Tab (treemap, comparison bars, summary table, sector-relative ROIC)~~
 23. ✅ ~~Peer Comparison Panel (Deep Dive table + radar chart vs sector median)~~
+24. ✅ ~~Macro Overlay Dashboard (US10Y, VIX, DXY, Oil with traffic-light VIX)~~
+25. ✅ ~~Portfolio Builder (equal-weight, inverse-vol, max-diversification with risk analytics)~~
+26. ✅ ~~Backtest (limited — survivorship-biased, current fundamentals as proxy, 1Y/3Y/5Y vs benchmark)~~
 
 ### Known Issues
 - FTSE_100 list has 99 tickers (SMDS removed due to acquisition) — add replacement when next constituent is confirmed
@@ -430,6 +485,147 @@ def fetch_ticker_data(ticker: str) -> dict:
 ---
 
 ## Implementation History
+
+### 2026-02-14 (Session 29) - Backtest (v1.9.0)
+**Enhancement** (`src/quant/backtest.py`, `src/ui/backtest_tab.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`, `src/ui/components.py`):
+- **Problem**: Users could screen, analyze, and build portfolios from filtered stocks but had no way to validate whether the screening criteria would have produced positive alpha historically. Without even a directional backtest, users had to take on faith that high-ROIC/low-D/E/near-52w-low stocks actually outperform. This made the screener a stock picker with no performance evidence.
+- **Fix**: Added a 6th tab "Backtest" that computes equal-weight portfolio returns for currently filtered stocks over 1Y/3Y/5Y periods, compared against the market benchmark. Includes a prominent survivorship bias disclaimer.
+
+**Critical Limitation (documented in UI)**:
+- yfinance provides NO historical fundamentals (income statements, balance sheets from 3 years ago)
+- The backtest uses current fundamentals as a proxy — it answers "if I had bought today's filtered stocks N years ago, how would they have performed?"
+- Has survivorship bias: companies that failed, were delisted, or were acquired are excluded from today's universe
+- Results are directional, not predictive
+
+**New File** (`src/quant/backtest.py`, ~230 lines):
+- `_fetch_and_slice_prices(ticker, start_date)` — fetches 5y cached prices via `fetch_historical_prices(ticker, period="5y")`, slices from start_date forward. Requires >20 data points. Returns close price Series or None.
+- `_build_portfolio_cumulative(tickers, index, start_date)` — normalizes tickers, fetches prices, aligns on common dates, computes equal-weight daily returns (mean of per-stock daily returns), cumulative return series, and per-stock total returns. Returns None if <2 tickers have valid data.
+- `_build_benchmark_cumulative(index, start_date)` — fetches benchmark index (^NSEI, ^GSPC, ^FTSE) prices, computes cumulative return series. Returns None if data unavailable.
+- `_compute_metrics(portfolio_daily, portfolio_cumulative, benchmark_cumulative, risk_free_rate, trading_days)` — total return, annualized return (compound), benchmark total return, alpha (annualized portfolio minus annualized benchmark), max drawdown, annualized volatility, Sharpe ratio.
+- `run_backtest(results_df, index, period)` — orchestrator: computes start_date from period trading days, builds portfolio + benchmark cumulative returns, computes metrics, builds per-stock detail list with total return and beat-benchmark flag, computes win rate, returns complete result dict.
+
+**New File** (`src/ui/backtest_tab.py`, ~250 lines):
+- `render_backtest_section(results_df_raw, screening_config)` — main entry point. Renders disclaimer, period radio, metrics cards, performance chart, stock table. Minimum 2 stocks required.
+- `_render_disclaimer()` — amber-bordered card with "Survivorship Bias Warning" header explaining the limitation clearly.
+- `_render_metrics_cards(metrics)` — 5 cards in a row: Total Return (green/red by sign), Annualized Return (green/red), Alpha vs Benchmark (green/red), Max Drawdown (green/amber/red thresholds), Win Rate (green >=60%, amber >=40%, red <40%).
+- `_create_performance_chart(portfolio_cumulative, benchmark_cumulative, index)` — 2-line Plotly chart: portfolio as emerald solid line, benchmark as violet dotted line. Y-axis shows cumulative return %, zero reference line, unified hover, horizontal legend above chart.
+- `_render_stock_table(stock_details, benchmark_return)` — Streamlit DataFrame with Ticker, Company, Total Return %, Beat Benchmark (Yes/No). Sorted by return descending.
+
+**Config Additions** (`src/utils/config.py`):
+- `BENCHMARK_TICKERS: Dict[str, str]` — NIFTY100: "^NSEI" (Nifty 50 index), SP500: "^GSPC" (S&P 500), FTSE100: "^FTSE" (FTSE 100). These are the standard yfinance tickers for market indices.
+- `BACKTEST_PERIODS: Dict[str, int]` — "1Y": 252, "3Y": 756, "5Y": 1260. Approximate trading days per period, used to compute calendar start date.
+
+**App Integration** (`app.py`):
+- 6th tab: `st.tabs([..., "Backtest"])` alongside existing 5 tabs.
+- `render_backtest_section()` receives `results_df_raw` and `screening_config` — no stocks_data needed since backtest only uses `fetch_historical_prices()` (cached).
+- No new session state keys — backtest is recomputed on every period change (fast with cached prices).
+
+**UI Updates**:
+- `sidebar.py`: New "Backtest" entry in Quant Mentor glossary explaining the methodology and survivorship bias warning. Version bumped to 1.9.0.
+- `components.py`: Footer version bumped to 1.9.0.
+
+**Design Decisions**:
+- **Equal-weight only, not using portfolio allocations**: The backtest answers a simpler question — "do these stocks collectively outperform?" Applying inverse-vol or max-div weights retroactively would compound the look-ahead bias (using today's volatility structure for historical allocation). Equal-weight is the most neutral baseline.
+- **5y max via fetch_historical_prices**: yfinance supports arbitrary periods, but 5y is the practical limit for most stocks. Some IPOs or recent listings won't have 5y data — these are gracefully excluded with a minimum 20-day threshold.
+- **Trading days for start_date calculation**: `start_date = now - (trading_days / 252 * 365)` converts trading days to calendar days. This is approximate but sufficient — the actual start date is determined by the first available price after this date.
+- **Prominent disclaimer, not hidden**: The survivorship bias warning is the FIRST element rendered in the tab, with amber border (attention color), before any results. This follows SEC/FINRA best practices for hypothetical performance disclosures.
+- **Win rate metric**: Shows what percentage of individual stocks beat the benchmark. A high portfolio return could be driven by 1-2 outliers — win rate reveals whether the screening criteria produce consistently above-average stocks or just lucky hits.
+- **Alpha computed from annualized returns, not raw**: Comparing 5-year total returns without annualizing would overstate alpha. Annualizing both portfolio and benchmark returns gives a fair per-year comparison.
+- **No new API calls for benchmark**: `fetch_historical_prices("^GSPC", period="5y")` uses the same cached fetcher as stock prices. One additional yfinance call per backtest (or zero if cached).
+- **Period selector in-tab, not sidebar**: Same pattern as Portfolio Builder — backtest configuration is only relevant when viewing the Backtest tab. Avoids sidebar clutter.
+- **No Sharpe in main metrics cards — replaced with Win Rate**: The 5 metrics are chosen for actionability: Total Return (did it make money?), Annualized (per-year rate), Alpha (did it beat the market?), Max Drawdown (worst pain point), Win Rate (consistency). Sharpe is still computed in metrics dict but not displayed as a card — volatility is less actionable for a historical backtest than win rate.
+
+### 2026-02-14 (Session 28) - Portfolio Builder (v1.8.0)
+**Enhancement** (`src/quant/portfolio.py`, `src/ui/portfolio_tab.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`, `src/ui/components.py`):
+- **Problem**: Users could screen and analyze individual stocks but had no tool to construct a diversified portfolio from their filtered universe. They had to manually decide allocation weights, with no visibility into portfolio-level risk metrics (volatility, Sharpe, drawdown) or inter-stock correlations. This gap between "stock picking" and "portfolio construction" meant the screener stopped short of actionable investment guidance.
+- **Fix**: Added a 5th tab "Portfolio Builder" with 3 allocation strategies, concentration limits by risk tolerance, portfolio metrics, and a correlation heatmap.
+
+**New File** (`src/quant/portfolio.py`, ~250 lines):
+- `build_returns_matrix(tickers, stocks_data, index)` — fetches 1y cached prices via `fetch_historical_prices()` (already cached 24h, zero additional API cost for most tickers). Builds aligned daily returns DataFrame, drops tickers with <20 data points. Returns None if <2 valid tickers.
+- `allocate_equal_weight(n)` — uniform 1/N. Baseline strategy, hard to beat in practice (DeMiguel et al. 2009).
+- `allocate_inverse_volatility(cov_matrix)` — weights = 1/vol, normalized. Lower-vol stocks get higher allocation. Simple, robust, no optimization needed.
+- `allocate_max_diversification(cov_matrix, iterations=1000)` — iterative risk-parity variant. Equalizes risk contribution relative to individual volatility. Starts from inverse-vol weights, iteratively adjusts using marginal risk contributions. No scipy/cvxpy dependency — pure numpy iteration with 1e-8 convergence threshold.
+- `apply_concentration_limits(weights, max_weight)` — iterative clip-and-redistribute (up to 50 iterations). Clips weights exceeding max, redistributes excess proportionally to uncapped stocks. Ensures final weights sum to 1.0.
+- `compute_portfolio_metrics(weights, returns_matrix, risk_free_rate)` — annualized expected return (mean daily × 252), annualized volatility (std × sqrt(252)), Sharpe ratio, max drawdown from cumulative weighted return series.
+- `build_portfolio()` — orchestrator: validates inputs, builds returns matrix, computes annualized covariance, dispatches to selected allocation method, applies concentration limits, computes metrics, builds allocation details with company/ROIC/score from results_df, returns correlation matrix for heatmap.
+
+**New File** (`src/ui/portfolio_tab.py`, ~250 lines):
+- `render_portfolio_section()` — main entry point. In-tab inputs (not sidebar): investment amount (number_input, default $100K), risk tolerance (horizontal radio: Conservative/Moderate/Aggressive), allocation method (selectbox: Equal Weight/Inverse Volatility/Max Diversification).
+- `_render_metrics_cards()` — 4 metric cards with conditional accent colors: Expected Return (green/red by sign), Portfolio Volatility (green <20%, amber <30%, red >30%), Sharpe (green >1, amber >0.5, red <0.5), Max Drawdown (green >-10%, amber >-20%, red <-20%).
+- `_render_allocation_table()` — Streamlit DataFrame with columns: Ticker, Company, Weight %, Amount (currency-formatted), ROIC, Value Score. CSV download button. Weight and ROIC converted to percentage for display.
+- `_create_allocation_pie()` — Plotly donut chart (hole=0.45) with 10-color palette cycling through accent colors. Dark theme, no legend (labels on chart), hover shows weight %.
+- `_create_correlation_heatmap()` — Plotly heatmap: blue (negative corr) → surface (zero) → red (positive corr). Annotated with rounded correlation values. Dynamic height based on ticker count. Reversed y-axis for conventional matrix layout.
+
+**Config Additions** (`src/utils/config.py`):
+- `PORTFOLIO_CONCENTRATION_LIMITS: Dict[str, float]` — Conservative: 0.15, Moderate: 0.20, Aggressive: 0.30. Caps per-stock weight to prevent over-concentration.
+- `PORTFOLIO_DEFAULT_AMOUNT: int = 100_000` — default investment amount.
+
+**App Integration** (`app.py`):
+- 5th tab: `st.tabs([..., "Portfolio Builder"])` alongside existing 4 tabs.
+- `render_portfolio_section()` receives `results_df_raw`, `screening_config`, `stocks_data` — same pattern as other tabs.
+- No new session state keys — portfolio is recomputed on every parameter change (fast: ~100ms for 20 stocks with cached prices).
+
+**UI Updates**:
+- `sidebar.py`: New "Portfolio Builder" entry in Quant Mentor glossary explaining the 3 methods, concentration limits, and metrics. Version bumped to 1.8.0.
+- `components.py`: Footer version bumped to 1.8.0.
+
+**Design Decisions**:
+- **Inputs inside the tab, not sidebar**: Portfolio configuration (amount, risk, method) is only relevant when viewing the Portfolio tab. Putting them in the sidebar would add clutter for users who never visit this tab. This follows the forecast tab pattern where stock selection is in-tab.
+- **No scipy dependency for max-diversification**: The iterative proportional fitting approach converges reliably for the small N (5-20 stocks) typical of this screener. Adding scipy or cvxpy for a full mean-variance optimizer would be overkill and add a heavy dependency. The iterative method produces near-optimal diversification ratios.
+- **Inverse-vol over minimum-variance**: Minimum-variance requires matrix inversion (unstable for near-singular covariance with correlated stocks). Inverse-vol is a diagonal approximation that's robust, interpretable, and performs comparably in practice for small portfolios.
+- **Concentration limits by risk tolerance**: Without caps, inverse-vol and max-div can produce extreme concentration (60%+ in one stock). Conservative investors need diversification; aggressive investors accept concentration for higher expected returns. The 15/20/30% caps are standard institutional thresholds.
+- **No new API calls**: `fetch_historical_prices()` is already cached 24h. For stocks that were analyzed in Deep Dive or Forecast tabs, the cache is warm. For others, it's a single yfinance call per ticker. With 5-20 filtered stocks, this is 5-20 cached calls — negligible.
+- **Recompute on every parameter change**: Portfolio computation takes ~100ms (matrix math on 20×252 returns). No need for session state caching — instant feedback as users change amount/risk/method.
+- **Correlation heatmap over efficient frontier**: Efficient frontier requires scipy optimization and can be misleading for small portfolios (overfitting to historical returns). Correlation heatmap is more actionable — users can see which stocks move together and whether their portfolio is genuinely diversified.
+- **Max drawdown from historical weighted returns**: Uses actual historical daily returns weighted by allocation. More realistic than parametric VaR — captures fat tails and clustering of losses.
+
+### 2026-02-14 (Session 27) - Macro Overlay Dashboard (v1.7.0)
+**Enhancement** (`src/data/macro_fetcher.py`, `src/ui/components.py`, `app.py`, `src/utils/config.py`, `src/ui/sidebar.py`):
+- **Problem**: Users had zero macro context when evaluating screened stocks. A stock that looks cheap during a market panic (VIX 35+) tells a different story than the same stock during calm markets (VIX 12). Rising yields and a strengthening dollar affect equity valuations globally, but this context was completely absent from the screening dashboard.
+- **Fix**: Added a "Market Context" section atop the Screening Results tab showing 4 macro indicators as metric cards with daily change and VIX traffic-light coloring.
+
+**New File** (`src/data/macro_fetcher.py`, ~85 lines):
+- `_fetch_single_indicator(yf_ticker)` — fetches 5-day price history via `yf.Ticker().history(period="5d")`. Extracts latest close and previous close to compute daily change %. Cached with `@st.cache_data(ttl=1800)` (30-minute TTL). Returns None on any failure (network, empty data, etc.).
+- `fetch_macro_indicators()` — orchestrator that fetches all 4 indicators from `MACRO_INDICATORS` config. Each indicator fetched independently in a loop — one failure does not block others. Returns dict mapping key to `{value, change_pct, label, unit}` or None per indicator.
+
+**Config Additions** (`src/utils/config.py`):
+- `MACRO_INDICATORS: Dict[str, Dict[str, str]]` — 4 indicators with yfinance tickers, display labels, and unit prefixes:
+  - US10Y: `^TNX` (US 10-Year Treasury yield, unit "%")
+  - VIX: `^VIX` (CBOE Volatility Index, unit "")
+  - DXY: `DX-Y.NYB` (US Dollar Index, unit "")
+  - OIL: `CL=F` (WTI Crude Oil futures, unit "$")
+- `VIX_THRESHOLDS: Tuple[float, float] = (15.0, 25.0)` — green/amber/red cutoffs
+- `MACRO_DATA_TTL: int = 1800` — 30-minute cache (more frequent than 1h price cache, since macro data changes intraday and stale VIX defeats the purpose)
+
+**UI Rendering** (`src/ui/components.py`):
+- `render_macro_context(macro_data)` — renders 4 `metric_card()` cards in a `st.columns(4)` row.
+  - VIX card: green accent if value < 15, amber if 15-25, red if > 25 (traffic-light system)
+  - US10Y, DXY, OIL: blue accent (neutral, informational)
+  - Delta shows daily change % with +/- sign
+  - US10Y formatted as "X.XX%", OIL as "$X.XX", others as "X.XX"
+  - Missing indicators show "N/A" with blue accent (graceful degradation)
+
+**App Integration** (`app.py`):
+- `fetch_macro_indicators()` imported from `src.data.macro_fetcher`
+- `render_macro_context` imported from `src.ui.components`
+- Rendered inside Screening Results tab, between the 12px spacer and the scatter plot section
+- Only rendered if at least one indicator fetched successfully
+- Entire block wrapped in try/except — macro failure never blocks screening results
+- Section header "Market Context" shown above the cards
+
+**UI Updates**:
+- `sidebar.py`: New "Market Context" entry in Quant Mentor glossary explaining the 4 indicators and VIX traffic-light. Version bumped to 1.7.0.
+- `components.py`: Footer version bumped to 1.7.0.
+
+**Design Decisions**:
+- **Standalone module, zero coupling**: `macro_fetcher.py` imports nothing from the screening pipeline. It only depends on `yfinance`, `streamlit` (for caching), and `config.py`. Can be tested, cached, and fail independently.
+- **5-day history, not 1-day**: `period="5d"` ensures we always get at least 2 data points even across weekends and holidays. `period="1d"` can return a single row on Monday morning, making change % impossible.
+- **30-minute cache TTL**: Macro indicators (especially VIX) can move significantly within an hour. 30 minutes balances freshness against API rate limits. The 4 extra yfinance calls every 30 minutes are negligible.
+- **Independent fetching, not batch**: Each indicator fetched in its own try/except. VIX fetch failing doesn't prevent oil from displaying. This is different from stock batch_fetch where we want all-or-nothing per ticker.
+- **try/except in app.py, not just in fetcher**: Defense in depth. Even if the entire macro module has an import error or config issue, screening results still render. The macro overlay is informational — never critical path.
+- **VIX traffic-light thresholds**: 15/25 are the standard institutional breakpoints. < 15 = "complacent" (historically normal), 15-25 = "elevated uncertainty" (most of the time), > 25 = "fear regime" (corrections, crises). These are widely used by JPMorgan, Goldman, and Bloomberg terminal defaults.
+- **No India VIX or FTSE VIX**: The 4 indicators are US-centric because they represent global macro conditions. US 10Y yield is the global risk-free benchmark, VIX is the global fear gauge, DXY affects emerging markets, and oil affects all economies. India VIX (`^INDIAVIX`) and VFTSE are secondary indicators that would add complexity without proportional value.
+- **Cards above scatter plot, not in sidebar**: Macro context needs to be visible when reviewing results, not buried in the sidebar. Placing it at the top of the Screening Results tab ensures users see the market environment before diving into individual stocks.
 
 ### 2026-02-14 (Session 26) - Data Quality Fixes (v1.6.1)
 **Bug Fixes** (`src/quant/metrics.py`, `src/quant/screener.py`, `src/utils/ticker_lists.py`, `src/data/fetcher.py`):
@@ -1513,6 +1709,7 @@ User Input (Tickers)
 
 #### `src/data/` (✅ IMPLEMENTED)
 - **fetcher.py**: yfinance API wrapper with retry logic, ticker normalization, financial statement fetching
+- **macro_fetcher.py**: Macro indicator fetcher (US10Y, VIX, DXY, Oil) with 30-min cache
 - **cache.py**: Dual TTL caching decorators (24h fundamentals, 1h price)
 - ~~**validator.py**~~: DELETED in v0.8.0 (unused dead code)
 
@@ -1526,6 +1723,8 @@ User Input (Tickers)
 - **screener.py**: Strict filtering pipeline, ranking algorithm, display formatting
 - **forecast.py**: Multi-model forecasting (DCF, Earnings Multiple, ROIC Growth), scenario analysis, risk metrics, composite forecasts
 - **metrics.py**: Momentum indicators (RSI, MACD, SMA crossover) with composite momentum score
+- **portfolio.py**: Portfolio construction (equal-weight, inverse-volatility, max-diversification), concentration limits, portfolio metrics (return, vol, Sharpe, drawdown)
+- **backtest.py**: Historical backtest engine (equal-weight portfolio vs benchmark, 1Y/3Y/5Y lookback, per-stock contributions, survivorship-biased)
 
 #### `src/ui/` (✅ IMPLEMENTED)
 - **styles.py**: Midnight Finance design system (color palette, global CSS, Plotly dark theme, HTML card helpers)
@@ -1535,6 +1734,8 @@ User Input (Tickers)
 - **deep_dive.py**: Per-stock analysis (Bollinger Bands, ROIC/FCF trends, P/E Mean Reversion, due diligence links)
 - **forecast_tab.py**: Forecast & Valuation tab (summary table, price target charts, model breakdown, risk dashboard, assumptions)
 - **sector_tab.py**: Sector Analysis tab (treemap by market cap/ROIC, sector comparison bars, summary table, sector-relative ROIC view)
+- **portfolio_tab.py**: Portfolio Builder tab (allocation inputs, allocation table, pie chart, metrics cards, correlation heatmap)
+- **backtest_tab.py**: Backtest tab (survivorship disclaimer, period selector, performance chart, metrics cards, per-stock table)
 
 ---
 
@@ -1707,5 +1908,5 @@ User Input (Tickers)
 
 ---
 
-**Last Updated**: 2026-02-14 (Session 26 - Data Quality Fixes - v1.6.1)
+**Last Updated**: 2026-02-14 (Session 29 - Backtest - v1.9.0)
 **Maintained By**: Claude (Senior Quant Developer)
