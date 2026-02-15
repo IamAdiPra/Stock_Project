@@ -8,6 +8,19 @@ import streamlit as st
 from src.utils.config import MIN_ROIC, MAX_DEBT_EQUITY
 from src.ui.styles import COLORS, filter_chip
 
+# Import glossary functions (with fallback for deployment)
+try:
+    from src.ui.glossary import (
+        search_glossary,
+        get_category_terms,
+        render_glossary_card,
+        get_all_categories,
+        FINANCIAL_GLOSSARY
+    )
+    GLOSSARY_AVAILABLE = True
+except ImportError:
+    GLOSSARY_AVAILABLE = False
+
 
 def render_sidebar() -> Dict[str, Any]:
     """
@@ -209,13 +222,10 @@ def render_quant_mentor() -> None:
     Render the Financial Dictionary expander in the sidebar.
     Searchable glossary with 80+ financial terms explained like to a 10-year-old.
     """
-    from src.ui.glossary import (
-        search_glossary,
-        get_category_terms,
-        render_glossary_card,
-        get_all_categories,
-        FINANCIAL_GLOSSARY
-    )
+    if not GLOSSARY_AVAILABLE:
+        with st.sidebar.expander("📚 Financial Dictionary", expanded=False):
+            st.warning("Glossary module not available. Please check your installation.")
+        return
 
     with st.sidebar.expander("📚 Financial Dictionary", expanded=False):
         # Search box

@@ -14,14 +14,14 @@ Author: Claude (Senior Quant Developer)
 Version: 1.10.0
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 
 # ============================================================================
 # FINANCIAL GLOSSARY - 80+ Terms Across 10 Categories
 # ============================================================================
 
-FINANCIAL_GLOSSARY: Dict[str, Dict[str, any]] = {
+FINANCIAL_GLOSSARY: Dict[str, Dict[str, Any]] = {
     # ========================================================================
     # CATEGORY: Quality Metrics
     # ========================================================================
@@ -724,7 +724,7 @@ FINANCIAL_GLOSSARY: Dict[str, Dict[str, any]] = {
 # HELPER FUNCTIONS
 # ============================================================================
 
-def get_definition(term: str) -> Optional[Dict[str, any]]:
+def get_definition(term: str) -> Optional[Dict[str, Any]]:
     """
     Returns the complete glossary entry for a given financial term.
 
